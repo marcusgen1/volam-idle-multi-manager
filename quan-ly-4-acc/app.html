@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quản lý 4 nhân vật</title>
+<style>
+  :root { --bg:#0e1412; --panel:#151d1a; --line:#2a3a34; --text:#e6e0d0; --dim:#8a9a92; --accent:#d8b04a; --ok:#6fcf8c; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-bottom: 1px solid var(--line); background: #101815; }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; color: var(--accent); font-weight: 600; }
+  .grp { display: flex; align-items: center; gap: 4px; }
+  .grp > span { color: var(--dim); margin-right: 2px; }
+  .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+  .grow { flex: 1; }
+  button { background:#1d2a25; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 9px; font:inherit; cursor:pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background:#2b3d34; border-color:var(--accent); color:var(--accent); }
+  button.sm { padding: 1px 7px; }
+
+  main { flex:1; min-height:0; display:grid; gap:5px; padding:5px; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+  main.row { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr; }
+  main.max { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  main.max .slot:not(.maxed) { display: none; }
+
+  .slot { display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
+  .bar { display:flex; align-items:center; gap:6px; padding:3px 6px; border-bottom:1px solid var(--line); }
+  .num { flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#1a1a10; font-weight:700; text-align:center; line-height:20px; font-size:12px; }
+  .bar input.label { flex:1; min-width:0; background:transparent; border:1px solid transparent; color:var(--text); font:inherit; font-weight:600; padding:2px 4px; border-radius:3px; }
+  .bar input.label:hover, .bar input.label:focus { border-color:var(--line); outline:none; }
+  .modes { display:flex; align-items:center; gap:3px; padding:2px 5px; border-bottom:1px solid var(--line); flex-wrap: wrap; }
+  .modes button.sm { padding:1px 5px; line-height:1.5; }
+  .modes .st { flex:1 1 90px; min-width:0; margin-left:4px; color:var(--dim); font-size:12px; text-align:right;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .modes .st b { color:var(--ok); font-weight:600; }
+  .frame { position:relative; flex:1; min-height:0; background:#000; }
+  iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  .off { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); background:#0a0f0d; }
+  footer { padding:3px 10px; color:var(--dim); font-size:12px; border-top:1px solid var(--line); }
+  @media (max-width: 900px) { main, main.row { grid-template-columns:1fr; grid-template-rows:none; overflow-y:auto; } .slot { height:80vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Quản lý 4 nhân vật</h1>
+  <div class="grp"><button id="lGrid" title="Bố cục 2×2">2×2</button><button id="lRow" title="4 cột cạnh nhau">4 cột</button></div>
+  <span class="sep"></span>
+  <div class="grp" id="allModes"><span>Cả 4:</span></div>
+  <span class="grow"></span>
+  <button id="reloadAll">Tải lại tất cả</button>
+</header>
+<main id="main"></main>
+<footer>
+  Nhiệm Vụ và Phó Bản: game tự về Luyện Công khi hết việc. Leo Tháp: gục ngã thì tự vào lại.
+  Mỗi khung chạy ở một cổng riêng (8801–8804) nên 4 tài khoản có phiên đăng nhập riêng. Trang này không lưu mật khẩu.
+</footer>
+
+<script>
+(() => {
+  const N = 4;
+  const BASE_PORT = 8800;
+  const KEY = "quanly4acc.app.v2";
+  const MODES = [
+    ["farm", "⚔", "Luyện Công"],
+    ["quest", "📜", "Nhiệm Vụ"],
+    ["dg", "🏯", "Phó Bản"],
+    ["tower", "🗼", "Leo Tháp"],
+  ];
+  const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, m || "—"])[2];
+  const frameOrigin = (i) => location.protocol + "//" + location.hostname + ":" + (BASE_PORT + i + 1);
+  const frameUrl = (i) => frameOrigin(i) + "/";
+
+  let state = {
+    layout: "grid",
+    slots: Array.from({ length: N }, (_, i) => ({ label: "Tài khoản " + (i + 1), on: true, desired: null })),
+  };
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY) || "null");
+    if (s && Array.isArray(s.slots) && s.slots.length === N) state = s;
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+
+  const main = document.getElementById("main");
+  let maxed = -1;
+  const els = [];
+  const live = Array.from({ length: N }, () => ({ mode: null, ready: false }));
+
+  function send(i, mode, restore) {
+    const f = els[i].iframe;
+    if (!f || !f.contentWindow) return;
+    try { f.contentWindow.postMessage({ vl: 1, type: "setMode", mode, restore: !!restore }, frameOrigin(i)); } catch (e) {}
+  }
+
+  // Người nhận khi bấm "Gửi bình Phúc Duyên" (sửa ở đây nếu cần đổi)
+  const PD_TO = "GiáoPháiĐạoÂm";
+
+  function sendPd(i, kind) {
+    const f = els[i].iframe;
+    if (!f || !f.contentWindow) return;
+    try { f.contentWindow.postMessage({ vl: 1, type: "pd", kind, to: PD_TO }, frameOrigin(i)); } catch (e) {}
+  }
+  // Gửi thư là không hoàn tác được, nên luôn hỏi lại trước khi gửi
+  function confirmSend(idxs) {
+    if (!idxs.length) return false;
+    const names = idxs.map((i) => (i + 1) + " (" + (state.slots[i].label || "Tài khoản " + (i + 1)) + ")").join(", ");
+    return confirm(
+      "Gửi TẤT CẢ bình Phúc Duyên Lộ (Đại, Trung, Tiểu) trong hành trang của khung " + names +
+      " cho nhân vật \"" + PD_TO + "\" qua thư (gộp cả 3 loại trong cùng một thư)?\n\nThư đã gửi không thể thu hồi."
+    );
+  }
+
+  function sendSell(i) {
+    const f = els[i].iframe;
+    if (!f || !f.contentWindow) return;
+    try { f.contentWindow.postMessage({ vl: 1, type: "sell", kept: !!state.sellKept }, frameOrigin(i)); } catch (e) {}
+  }
+  function sendAutoSell(i) {
+    const f = els[i].iframe;
+    if (!f || !f.contentWindow) return;
+    try { f.contentWindow.postMessage({ vl: 1, type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept }, frameOrigin(i)); } catch (e) {}
+  }
+
+  function sendBoss(i) {
+    const f = els[i].iframe;
+    if (!f || !f.contentWindow) return;
+    try { f.contentWindow.postMessage({ vl: 1, type: "boss" }, frameOrigin(i)); } catch (e) {}
+  }
+
+  function setDesired(i, mode) {
+    state.slots[i].desired = mode;
+    save();
+    refresh(i);
+    if (state.slots[i].on) send(i, mode);
+  }
+
+  function refresh(i) {
+    const c = els[i];
+    const d = state.slots[i].desired;
+    c.mbtns.forEach((b) => b.classList.toggle("on", b.dataset.m === d));
+    const l = live[i];
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    if (!state.slots[i].on) {
+      c.st.textContent = "Đang tắt";
+      c.st.title = "";
+      return;
+    }
+    if (!l.ready) {
+      c.st.textContent = "Chưa vào game";
+      c.st.title = "";
+      return;
+    }
+    // Một dòng gọn: chế độ hiện tại + thông báo mới nhất (cắt bớt bằng …). Rê chuột vào để xem đầy đủ.
+    const modeTxt = "Đang: " + modeName(l.mode) + (l.next ? " → " + modeName(l.next) : "");
+    c.st.innerHTML = "Đang: <b>" + esc(modeName(l.mode)) + "</b>" + (l.next ? " → " + esc(modeName(l.next)) : "") +
+      (l.lastMsg ? " · " + esc(l.lastMsg) : "");
+    c.st.title = [modeTxt, l.note, l.boss, l.pd, l.sell].filter(Boolean).join("\n");
+  }
+
+  function mount(i, on) {
+    const c = els[i];
+    c.frame.textContent = "";
+    c.iframe = null;
+    live[i] = { mode: null, ready: false };
+    if (on) {
+      const f = document.createElement("iframe");
+      f.setAttribute("allow", "autoplay; fullscreen");
+      f.src = frameUrl(i);
+      c.frame.appendChild(f);
+      c.iframe = f;
+    } else {
+      const d = document.createElement("div");
+      d.className = "off";
+      d.textContent = "Khung đang tắt (bấm ⏻ để bật)";
+      c.frame.appendChild(d);
+    }
+    refresh(i);
+  }
+
+  // Tin nhắn từ script trong khung game: hello (vừa tải xong) / status (chế độ hiện tại)
+  window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (!m || m.vl !== 1) return;
+    const i = els.findIndex((c) => c.iframe && c.iframe.contentWindow === e.source);
+    if (i < 0 || e.origin !== frameOrigin(i)) return;
+    if (m.type === "hello") {
+      const d = state.slots[i].desired;
+      if (d) send(i, d, true);
+      if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
+    } else if (m.type === "status") {
+      const prev = live[i] || {};
+      const nl = { mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pd: m.pd || "", sell: m.sell || "" };
+      // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
+      nl.lastMsg = prev.lastMsg || "";
+      for (const k of ["note", "boss", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
+      live[i] = nl;
+      // Bạn tự đổi chế độ ngay trong khung, hoặc tháp bị chặn -> đồng bộ lại lựa chọn
+      if (m.sync && m.desired !== state.slots[i].desired) {
+        state.slots[i].desired = m.desired;
+        save();
+      }
+      refresh(i);
+    }
+  });
+
+  state.slots.forEach((s, i) => {
+    const slot = document.createElement("section");
+    slot.className = "slot";
+    slot.innerHTML =
+      '<div class="bar"><span class="num">' + (i + 1) + '</span>' +
+      '<input class="label" maxlength="40" aria-label="Tên khung ' + (i + 1) + '">' +
+      '<button class="sm" data-a="reload" title="Tải lại khung này">⟳</button>' +
+      '<button class="sm" data-a="max" title="Phóng to / thu nhỏ">⛶</button>' +
+      '<button class="sm" data-a="power" title="Tắt / bật khung (giảm tải máy)">⏻</button></div>' +
+      '<div class="modes">' +
+      // Chỉ hiện biểu tượng cho gọn; rê chuột vào để xem tên nút
+      MODES.map((m) => '<button class="sm" data-m="' + m[0] + '" title="' + m[2] + '" aria-label="' + m[2] + '">' + m[1] + '</button>').join("") +
+      '<button class="sm" data-m="combo" title="Chạy tất cả: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công" aria-label="Chạy tất cả">▶</button>' +
+      '<button class="sm" data-boss title="Boss tuần: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng)" aria-label="Boss tuần">👹</button>' +
+      '<button class="sm" data-sell title="Bán đồ xanh trong hành trang (đồ khóa, đồ đang mặc, đồ bạn đặt giữ được giữ lại)" aria-label="Bán đồ xanh">💰</button>' +
+      '<button class="sm" data-pdd title="Đóng bình: đóng hết Phúc Duyên chờ đóng thành bình Đại / Trung / Tiểu" aria-label="Đóng bình">🎐</button>' +
+      '<button class="sm" data-pdg title="Gửi bình: gửi thư hết bình Phúc Duyên Lộ Đại / Trung / Tiểu cho ' + PD_TO + '" aria-label="Gửi bình">📨</button>' +
+      '<span class="st"></span></div>' +
+      '<div class="frame"></div>';
+    main.appendChild(slot);
+    const label = slot.querySelector(".label");
+    label.value = s.label;
+    label.oninput = () => { s.label = label.value; save(); };
+    const c = { slot, frame: slot.querySelector(".frame"), iframe: null, st: slot.querySelector(".st"), mbtns: [...slot.querySelectorAll("[data-m]")] };
+    els.push(c);
+    c.mbtns.forEach((b) => (b.onclick = () => setDesired(i, b.dataset.m)));
+    slot.querySelector("[data-boss]").onclick = () => sendBoss(i);
+    slot.querySelector("[data-sell]").onclick = () => sendSell(i);
+    slot.querySelector("[data-pdd]").onclick = () => sendPd(i, "dong");
+    slot.querySelector("[data-pdg]").onclick = () => { if (confirmSend([i])) sendPd(i, "gui"); };
+    slot.querySelector('[data-a="reload"]').onclick = () => { if (s.on) mount(i, true); };
+    slot.querySelector('[data-a="max"]').onclick = () => { maxed = maxed === i ? -1 : i; applyLayout(); };
+    slot.querySelector('[data-a="power"]').onclick = () => { s.on = !s.on; save(); mount(i, s.on); };
+    mount(i, s.on);
+  });
+
+  // Nút chọn chế độ cho cả 4 nhân vật
+  const allBox = document.getElementById("allModes");
+  MODES.forEach((m) => {
+    const b = document.createElement("button");
+    b.textContent = m[1] + " " + m[2];
+    b.title = "Đặt cả 4 nhân vật sang " + m[2];
+    b.onclick = () => state.slots.forEach((s, i) => s.on && setDesired(i, m[0]));
+    allBox.appendChild(b);
+  });
+  const bossBtn = document.createElement("button");
+  bossBtn.textContent = "👹 Boss tuần";
+  bossBtn.title = "Cả 4 nhân vật: tự khiêu chiến Boss tuần cho đến hết lượt (bấm lần nữa để dừng)";
+  bossBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendBoss(i));
+  allBox.appendChild(bossBtn);
+  const sellBtn = document.createElement("button");
+  sellBtn.textContent = "💰 Bán đồ xanh";
+  sellBtn.title = "Cả 4 nhân vật: bán đồ xanh trong hành trang ngay bây giờ";
+  sellBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendSell(i));
+  allBox.appendChild(sellBtn);
+  const autoBtn = document.createElement("button");
+  const renderAuto = () => {
+    autoBtn.textContent = "🔁 Tự bán khi đầy: " + (state.autoSell ? "BẬT" : "TẮT");
+    autoBtn.classList.toggle("on", !!state.autoSell);
+  };
+  autoBtn.title = "Bật: khi hành trang gần đầy thì tự bán đồ xanh (kiểm tra mỗi 30 giây)";
+  autoBtn.onclick = () => {
+    state.autoSell = !state.autoSell;
+    save();
+    renderAuto();
+    state.slots.forEach((s, i) => s.on && sendAutoSell(i));
+  };
+  renderAuto();
+  allBox.appendChild(autoBtn);
+  // Mặc định chỉ bán đồ xanh mà game KHÔNG giữ. Bật ô này để bán cả đồ xanh game đang giữ (khớp luật giữ / mạnh hơn đồ đang mặc).
+  const keptLbl = document.createElement("label");
+  keptLbl.style.cssText = "display:flex;align-items:center;gap:4px;color:var(--dim);cursor:pointer";
+  keptLbl.title = "Bán cả đồ xanh game đang giữ vì khớp luật giữ hoặc mạnh hơn đồ đang mặc. Món khóa 🔒 vẫn được giữ lại.";
+  const keptChk = document.createElement("input");
+  keptChk.type = "checkbox";
+  keptChk.checked = !!state.sellKept;
+  keptChk.onchange = () => {
+    if (keptChk.checked && !confirm(
+      "Bật chế độ này, việc bán đồ xanh sẽ bán CẢ những món xanh game đang giữ vì khớp luật \"giữ\" của bạn " +
+      "hoặc mạnh hơn đồ đang mặc.\n\nMón khóa 🔒 và đồ cần cho Dã Tẩu vẫn được giữ lại. Món đã bán không lấy lại được.\n\nTiếp tục?"
+    )) { keptChk.checked = false; return; }
+    state.sellKept = keptChk.checked;
+    save();
+    if (state.autoSell) state.slots.forEach((s, i) => s.on && sendAutoSell(i));
+  };
+  keptLbl.appendChild(keptChk);
+  keptLbl.appendChild(document.createTextNode("gồm cả đồ được giữ"));
+  allBox.appendChild(keptLbl);
+  const dongBtn = document.createElement("button");
+  dongBtn.textContent = "🎐 Đóng bình";
+  dongBtn.title = "Cả 4 nhân vật: đóng hết Phúc Duyên chờ đóng bình thành bình Đại / Trung / Tiểu";
+  dongBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendPd(i, "dong"));
+  allBox.appendChild(dongBtn);
+  const guiBtn = document.createElement("button");
+  guiBtn.textContent = "📨 Gửi bình";
+  guiBtn.title = "Cả 4 nhân vật: gửi thư hết bình Phúc Duyên Lộ Đại / Trung / Tiểu cho " + PD_TO;
+  guiBtn.onclick = () => {
+    const idxs = state.slots.map((s, i) => (s.on ? i : -1)).filter((i) => i >= 0);
+    if (confirmSend(idxs)) idxs.forEach((i) => sendPd(i, "gui"));
+  };
+  allBox.appendChild(guiBtn);
+  const comboBtn = document.createElement("button");
+  comboBtn.textContent = "▶ Chạy tất cả";
+  comboBtn.title = "Cả 4 nhân vật: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công";
+  comboBtn.onclick = () => state.slots.forEach((s, i) => s.on && setDesired(i, "combo"));
+  allBox.appendChild(comboBtn);
+
+  const lGrid = document.getElementById("lGrid");
+  const lRow = document.getElementById("lRow");
+  function applyLayout() {
+    main.className = maxed >= 0 ? "max" : state.layout === "row" ? "row" : "";
+    els.forEach((c, i) => c.slot.classList.toggle("maxed", i === maxed));
+    lGrid.classList.toggle("on", state.layout !== "row");
+    lRow.classList.toggle("on", state.layout === "row");
+  }
+  lGrid.onclick = () => { state.layout = "grid"; maxed = -1; save(); applyLayout(); };
+  lRow.onclick = () => { state.layout = "row"; maxed = -1; save(); applyLayout(); };
+  document.getElementById("reloadAll").onclick = () => state.slots.forEach((s, i) => s.on && mount(i, true));
+  applyLayout();
+})();
+</script>
+</body>
+</html>

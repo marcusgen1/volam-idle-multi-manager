@@ -1,0 +1,12 @@
+{
+  "name": "volam-idle-multi-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Trang quản lý 4 nhân vật Võ Lâm Idle trong một trang (máy chủ cục bộ + script điều khiển)",
+  "scripts": {
+    "start": "node --watch quan-ly-4-acc/server.js"
+  },
+  "engines": {
+    "node": ">=18.11"
+  }
+}

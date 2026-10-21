@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+.claude/
+
+# Bản ghi chú cũ, không còn dùng (đã thay bằng quan-ly-4-acc/app.html)
+quan-ly-4-acc/index.html
