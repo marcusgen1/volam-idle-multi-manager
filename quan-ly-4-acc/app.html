@@ -9,11 +9,12 @@
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body { background: var(--bg); color: var(--text); font: 13px/1.4 system-ui, "Segoe UI", sans-serif; display: flex; flex-direction: column; }
-  header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 10px; border-bottom: 1px solid var(--line); background: #101815; }
-  header h1 { font-size: 15px; margin: 0 8px 0 0; color: var(--accent); font-weight: 600; }
-  .grp { display: flex; align-items: center; gap: 4px; }
-  .grp > span { color: var(--dim); margin-right: 2px; }
-  .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 4px; }
+  header { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 3px 8px; border-bottom: 1px solid var(--line); background: #101815; }
+  header h1 { font-size: 13px; margin: 0 4px 0 0; color: var(--accent); font-weight: 600; white-space: nowrap; }
+  header button { padding: 1px 6px; font-size: 12px; line-height: 1.5; white-space: nowrap; }
+  .grp { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+  .grp > span { color: var(--dim); margin-right: 1px; font-size: 12px; white-space: nowrap; }
+  .sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 2px; }
   .grow { flex: 1; }
   button { background:#1d2a25; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 9px; font:inherit; cursor:pointer; }
   button:hover { border-color: var(--accent); }
@@ -49,7 +50,7 @@
   <span class="sep"></span>
   <div class="grp" id="allModes"><span>Cả 4:</span></div>
   <span class="grow"></span>
-  <button id="reloadAll">Tải lại tất cả</button>
+  <button id="reloadAll" title="Tải lại cả 4 khung game">⟳ Tải lại</button>
 </header>
 <main id="main"></main>
 <footer>
@@ -255,13 +256,13 @@
   bossBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendBoss(i));
   allBox.appendChild(bossBtn);
   const sellBtn = document.createElement("button");
-  sellBtn.textContent = "💰 Bán đồ xanh";
+  sellBtn.textContent = "💰 Bán xanh";
   sellBtn.title = "Cả 4 nhân vật: bán đồ xanh trong hành trang ngay bây giờ";
   sellBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendSell(i));
   allBox.appendChild(sellBtn);
   const autoBtn = document.createElement("button");
   const renderAuto = () => {
-    autoBtn.textContent = "🔁 Tự bán khi đầy: " + (state.autoSell ? "BẬT" : "TẮT");
+    autoBtn.textContent = "🔁 Tự bán: " + (state.autoSell ? "BẬT" : "TẮT");
     autoBtn.classList.toggle("on", !!state.autoSell);
   };
   autoBtn.title = "Bật: khi hành trang gần đầy thì tự bán đồ xanh (kiểm tra mỗi 30 giây)";
@@ -290,7 +291,7 @@
     if (state.autoSell) state.slots.forEach((s, i) => s.on && sendAutoSell(i));
   };
   keptLbl.appendChild(keptChk);
-  keptLbl.appendChild(document.createTextNode("gồm cả đồ được giữ"));
+  keptLbl.appendChild(document.createTextNode("gồm đồ giữ"));
   allBox.appendChild(keptLbl);
   const dongBtn = document.createElement("button");
   dongBtn.textContent = "🎐 Đóng bình";
@@ -306,7 +307,7 @@
   };
   allBox.appendChild(guiBtn);
   const comboBtn = document.createElement("button");
-  comboBtn.textContent = "▶ Chạy tất cả";
+  comboBtn.textContent = "▶ Chạy hết";
   comboBtn.title = "Cả 4 nhân vật: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công";
   comboBtn.onclick = () => state.slots.forEach((s, i) => s.on && setDesired(i, "combo"));
   allBox.appendChild(comboBtn);
