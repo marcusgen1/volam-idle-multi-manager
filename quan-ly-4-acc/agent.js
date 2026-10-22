@@ -54,6 +54,18 @@
     if (!el || !marker) return 0;
     return (el.textContent.match(new RegExp(marker, "g")) || []).length;
   };
+  // Khung Theo Dấu có đang ghi việc của chế độ m không.
+  // Nhiệm Vụ: bất kỳ dòng nào (Dã Tẩu, Sát Thủ, thuyền, phó bản) = còn việc.
+  // Phó Bản: chỉ tính dòng phó bản / thuyền (dòng không có data-q). Dòng Dã Tẩu vẫn hiện khi còn nhiệm vụ nên KHÔNG được
+  // coi là việc của Phó Bản, nếu không Phó Bản không bao giờ được coi là xong để chuyển sang Nhiệm Vụ.
+  // Khung đang thu gọn (▸) không hiện các dòng nên không xem được: coi như còn bận.
+  const trackerBusy = (m) => {
+    if (!q("#u20trk .u2trh")) return false;
+    if (m !== "dg") return true;
+    const arrow = q("#u20trk .u2trh b");
+    if (arrow && arrow.textContent.indexOf("▸") >= 0) return true;
+    return !!q("#u20trk > div:not(.u2trh):not([data-q])");
+  };
   // Game có vẽ khung Theo Dấu ở kích thước cửa sổ hiện tại không: phần tử phải tồn tại và cột chứa nó không bị ẩn hẳn
   const trackerOk = () => {
     const rc = q("#u20rc");
@@ -116,7 +128,7 @@
 
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
-    const msg = { type: "status", mode: curMode(), ready: !!q("#mswMenu"), desired, next: queue[0] || null, note, boss: bossMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready: !!q("#mswMenu"), desired, next: queue[0] || null, note, boss: bossMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -442,18 +454,26 @@
   let sellRun = false;
   let autoSell = false;
   let autoSellKept = false; // tự bán có gồm cả đồ xanh game đang giữ không
+  let autoInfo = ""; // trạng thái kiểm tra hành trang gần nhất của chế độ tự bán
   let autoSellLast = 0;
 
   // Đọc số món trong hành trang ("57/60") bằng cách chuyển sang thẻ Hành trang rồi trả lại ngay (không có chỗ chờ nên không nháy)
+  // Số ô nằm ở chỗ khác nhau tùy bố cục: ".invbar span" (bố cục cũ) hoặc ".u2bh span" (bố cục mới, game dựng lại màn Hành trang).
+  const readInvCount = () => {
+    for (const el of qa("#t-inv .invbar span, #t-inv .u2bh span")) {
+      const m = el.textContent.match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/);
+      if (m) return { n: +m[1], max: +m[2] };
+    }
+    return null;
+  };
   const peekInv = () => {
     const invTab = q('#tabs button[data-t="inv"]');
-    if (!invTab) return null;
+    if (!invTab) return { err: "không thấy thẻ Hành trang" };
     const prev = activeTab();
     if (prev !== "inv") invTab.click();
-    const el = q("#t-inv .invbar span");
-    const m = el && el.textContent.match(/(\d+)\s*\/\s*(\d+)/);
+    const c = readInvCount();
     if (prev !== "inv") restoreTab(prev);
-    return m ? { n: +m[1], max: +m[2] } : null;
+    return c || { err: "không đọc được số ô hành trang" };
   };
   const dkEl = (k) => q('#mBody [data-dk="' + k + '"]');
   // Mỗi lần đổi một ô, game vẽ lại cả cửa sổ nên phải tìm lại phần tử sau mỗi lần
@@ -603,7 +623,12 @@
     if (modal && !modal.classList.contains("hidden")) return; // bạn đang dùng một cửa sổ
     if (autoSellLast && Date.now() - autoSellLast < AUTO_SELL_COOLDOWN_MS) return;
     const c = peekInv();
-    if (!c || c.n < c.max - AUTO_SELL_MARGIN) return;
+    const info = c.err ? "Tự bán: " + c.err : "Tự bán: hành trang " + c.n + "/" + c.max + (c.n >= c.max - AUTO_SELL_MARGIN ? " (đầy)" : " (chưa đầy)");
+    if (info !== autoInfo) {
+      autoInfo = info; // hiện trong chú thích của dòng trạng thái để biết chức năng có đang chạy không
+      report(true);
+    }
+    if (c.err || c.n < c.max - AUTO_SELL_MARGIN) return;
     const r = await runSell(true, autoSellKept);
     autoSellLast = r.sold > 0 ? 0 : Date.now(); // bán được thì lần sau đầy lại bán tiếp; không có gì để bán thì nghỉ một lúc
   }
@@ -623,7 +648,9 @@
       autoSell = !!m.on;
       autoSellKept = !!m.kept;
       autoSellLast = 0;
+      autoInfo = "";
       report(true);
+      if (autoSell) autoSellTick().catch(() => {}); // kiểm tra ngay khi vừa bật, không phải chờ 30 giây
       return;
     }
     if (m && m.vl === 1 && m.type === "pd") {
@@ -677,7 +704,7 @@
     if (desired && !applied) {
       applied = true;
       resetWork();
-      const busy = !!q("#u20trk .u2trh");
+      const busy = trackerBusy(desired);
       if (mode !== desired) {
         clickMode(desired);
       } else if (explicit && !busy && (desired === "quest" || desired === "dg")) {
@@ -690,7 +717,7 @@
       if (desired === "dg" && toastHas(TOAST_DONE.dg)) finishWork("thông báo hết lượt");
     } else if ((desired === "quest" || desired === "dg") && mode === desired) {
       // Game giữ nhãn Nhiệm Vụ / Phó Bản dù đã hết việc (chỉ dời bãi). Nhận biết hết việc để tự về Luyện Công.
-      const busy = !!q("#u20trk .u2trh"); // khung Theo Dấu chỉ hiện khi còn việc (kể cả khi thu gọn)
+      const busy = trackerBusy(desired); // khung Theo Dấu còn ghi việc của chế độ này không
       const now = Date.now();
       let done = false;
       let why = "";

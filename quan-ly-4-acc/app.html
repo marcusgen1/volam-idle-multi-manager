@@ -156,7 +156,7 @@
     const modeTxt = "Đang: " + modeName(l.mode) + (l.next ? " → " + modeName(l.next) : "");
     c.st.innerHTML = "Đang: <b>" + esc(modeName(l.mode)) + "</b>" + (l.next ? " → " + esc(modeName(l.next)) : "") +
       (l.lastMsg ? " · " + esc(l.lastMsg) : "");
-    c.st.title = [modeTxt, l.note, l.boss, l.pd, l.sell].filter(Boolean).join("\n");
+    c.st.title = [modeTxt, l.note, l.boss, l.pd, l.sell, l.autoInfo].filter(Boolean).join("\n");
   }
 
   function mount(i, on) {
@@ -191,7 +191,7 @@
       if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
     } else if (m.type === "status") {
       const prev = live[i] || {};
-      const nl = { mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pd: m.pd || "", sell: m.sell || "" };
+      const nl = { mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "" };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
