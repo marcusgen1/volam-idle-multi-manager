@@ -128,7 +128,8 @@
 
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
-    const msg = { type: "status", mode: curMode(), ready: !!q("#mswMenu"), desired, next: queue[0] || null, note, boss: bossMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const ready = !!q("#mswMenu");
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -160,7 +161,7 @@
     return el && el.id ? el.id.replace(/^t-/, "") : null;
   };
   const restoreTab = (prev) => {
-    if (!prev || prev === "quest") return;
+    if (!prev || activeTab() === prev) return; // đang ở đúng thẻ rồi thì thôi (bấm lại thẻ đang mở sẽ nhảy sang thẻ khác)
     const b = q('#tabs button[data-t="' + prev + '"]');
     if (b) b.click();
   };
@@ -694,11 +695,64 @@
     true
   );
 
+  // --- Tên nhân vật + cấp độ (để trang quản lý hiện làm tên khung) ---
+  // Cấp độ: phần tử #lv luôn có trên màn hình. Tên nhân vật game không hiện cố định (ô "heroName" là tên phái),
+  // chỉ có trong thẻ Nhân vật (".u2nm", kèm nút bút chì ✎) nên đọc từ đó rồi nhớ lại, làm mới mỗi 5 phút.
+  // Dự phòng: dòng "Tên · cấp N" của menu Hệ Thống. Nhân vật chưa đặt tên thì game hiện tên phái ở chỗ đó.
+  const HERO_REFRESH_MS = 300000;
+  const HERO_RETRY_MS = 20000; // chưa đọc được thì thử lại sau bấy lâu
+  let heroName = "";
+  let heroAt = 0;
+  const readLevel = () => {
+    const el = q("#lv");
+    const n = el ? parseInt(el.textContent, 10) : NaN;
+    return n > 0 ? n : 0;
+  };
+  // Chuyển sang thẻ khác, đọc, trả lại thẻ cũ ngay trong một lần chạy (không có chỗ chờ nên không nháy)
+  const readFromTab = (tabName, read) => {
+    const tab = q('#tabs button[data-t="' + tabName + '"]');
+    if (!tab) return "";
+    const prev = activeTab();
+    if (prev !== tabName) tab.click();
+    let out = "";
+    try {
+      out = read() || "";
+    } finally {
+      restoreTab(prev);
+    }
+    return out;
+  };
+  const peekHeroName = () => {
+    heroAt = Date.now();
+    let name = readFromTab("char", () => {
+      const el = q("#t-char .u2nm");
+      if (!el) return "";
+      const c = el.cloneNode(true);
+      c.querySelectorAll("button").forEach((b) => b.remove()); // bỏ nút bút chì ✎
+      return c.textContent.replace(/\s+/g, " ").trim();
+    });
+    if (!name) {
+      name = readFromTab("more", () => {
+        const el = q("#t-more .escm-who");
+        const m = el && el.textContent.match(/^\s*(.+?)\s·\scấp\s\d+/);
+        return m ? m[1].trim() : "";
+      });
+    }
+    if (name) heroName = name;
+  };
+  const heroTick = () => {
+    if (sellRun || bossRun || pdRun) return;
+    const modal = q("#modal");
+    if (modal && !modal.classList.contains("hidden")) return; // bạn đang dùng một cửa sổ
+    if (Date.now() - heroAt >= (heroName ? HERO_REFRESH_MS : HERO_RETRY_MS)) peekHeroName();
+  };
+
   function tick() {
     if (!q("#mswMenu")) {
       report(false);
       return;
     }
+    heroTick();
     const mode = curMode();
 
     if (desired && !applied) {
