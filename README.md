@@ -1,6 +1,6 @@
-# Võ Lâm Idle – Quản lý 4 nhân vật
+# Võ Lâm Idle – Quản lý nhiều nhân vật
 
-Trang quản lý chạy **4 cửa sổ game cạnh nhau trong một trang**, mỗi cửa sổ đăng nhập một tài khoản riêng,
+Trang quản lý chạy **nhiều cửa sổ game cạnh nhau trong một trang** (mặc định 4, thêm được tới 12), mỗi cửa sổ đăng nhập một tài khoản riêng,
 kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh, đóng/gửi bình Phúc Duyên…).
 
 > Repo riêng tư. Không chứa mã của game: máy chủ cục bộ chuyển tiếp trang game từ `https://volamidle.pages.dev` lúc chạy.
@@ -9,7 +9,7 @@ kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xa
 
 | Tệp | Vai trò |
 |---|---|
-| `quan-ly-4-acc/server.js` | Máy chủ cục bộ (Node.js): phục vụ trang quản lý và chuyển tiếp game qua 4 cổng riêng |
+| `quan-ly-4-acc/server.js` | Máy chủ cục bộ (Node.js): phục vụ trang quản lý và chuyển tiếp game qua các cổng riêng (mỗi khung một cổng) |
 | `quan-ly-4-acc/app.html` | Trang quản lý (giao diện) |
 | `quan-ly-4-acc/agent.js` | Script được chèn vào từng khung game để điều khiển chế độ chơi |
 | `quan-ly-4-acc/chay-quan-ly.bat` / `.sh` | Chạy máy chủ + mở trang (Windows / Linux, macOS) |
@@ -27,7 +27,7 @@ Cần **Node.js 18.11 trở lên**.
 
 Sau đó mở <http://127.0.0.1:8800/>.
 
-- Cổng `8800`: trang quản lý. Cổng `8801`–`8804`: bốn bản chuyển tiếp tới game, mỗi cổng là một *origin* riêng nên
+- Cổng `8800`: trang quản lý. Cổng `8801`–`8812` (mặc định 12 cổng): các bản chuyển tiếp tới game, mỗi cổng là một *origin* riêng nên
   4 tài khoản có kho lưu trữ / phiên đăng nhập riêng, không đè nhau.
 - Máy chủ chỉ lắng nghe `127.0.0.1` (chỉ máy bạn truy cập được).
 - Điều duy nhất được thay đổi so với trang gốc: HTML của game được chèn thêm một dòng `<script src="/__agent.js">`
@@ -65,17 +65,19 @@ chmod +x quan-ly-4-acc/*.sh        # chỉ cần làm một lần
 ```
 
 Script tự mở trình duyệt vào <http://127.0.0.1:8800/> nếu có môi trường đồ họa (`xdg-open`); không thì bạn tự mở địa chỉ đó.
-Nhấn `Ctrl+C` trong terminal để tắt (4 khung game sẽ mất kết nối).
+Nhấn `Ctrl+C` trong terminal để tắt (các khung game sẽ mất kết nối).
 
 ### 3. Máy Linux không có màn hình (VPS / server) – truy cập từ máy khác
 
 Máy chủ chỉ nghe trên `127.0.0.1`, nên dùng **SSH tunnel** và phải chuyển tiếp **cả 5 cổng** (8800 cho trang quản lý
-và 8801–8804 cho 4 khung game, vì trình duyệt của bạn gọi trực tiếp các cổng này):
+và 8801–8812 cho các khung game, vì trình duyệt của bạn gọi trực tiếp các cổng này; chỉ cần các cổng bạn dùng):
 
 ```bash
 ssh -N \
   -L 8800:127.0.0.1:8800 -L 8801:127.0.0.1:8801 -L 8802:127.0.0.1:8802 \
-  -L 8803:127.0.0.1:8803 -L 8804:127.0.0.1:8804 \
+  -L 8803:127.0.0.1:8803 -L 8804:127.0.0.1:8804 -L 8805:127.0.0.1:8805 -L 8806:127.0.0.1:8806 \
+  -L 8807:127.0.0.1:8807 -L 8808:127.0.0.1:8808 -L 8809:127.0.0.1:8809 -L 8810:127.0.0.1:8810 \
+  -L 8811:127.0.0.1:8811 -L 8812:127.0.0.1:8812 \
   nguoidung@dia-chi-may-linux
 ```
 
@@ -103,11 +105,12 @@ nên lần sau game nhớ đăng nhập. Phương án này không dùng trang qu
 | `EADDRINUSE` (cổng đã được dùng) | Đã có một máy chủ đang chạy: `ss -ltnp \| grep 880` rồi tắt tiến trình cũ |
 | `node: not found` hoặc `--watch` không nhận | Node.js chưa cài hoặc cũ hơn 18.11: xem lại mục 1 |
 | Trang trắng ở các khung game | Máy cần truy cập được `https://volamidle.pages.dev` (kiểm tra mạng / proxy) |
-| Dùng SSH tunnel mà khung game không tải | Thiếu một trong các cổng 8801–8804 trong lệnh `ssh -L` |
+| Dùng SSH tunnel mà khung game không tải | Thiếu cổng của khung đó (8801–8812) trong lệnh `ssh -L` |
 
 ## Tính năng chính
 
-- Chọn chế độ cho cả 4 hoặc từng khung: Luyện Công, Nhiệm Vụ, Phó Bản, Leo Tháp, **Chạy tất cả** (Phó Bản → Nhiệm Vụ).
+- **Thêm / xóa khung**: nút **＋ Thêm khung** ở đầu trang (tối đa bằng số cổng máy chủ mở, mặc định 12) và nút **✕** ở mỗi khung. Mỗi khung giữ một cổng cố định nên xóa một khung không làm mất phiên đăng nhập của khung khác. Muốn nhiều hoặc ít khung hơn: `VL_SLOTS=8 npm start`. Mỗi khung là một bản game chạy riêng nên càng nhiều khung máy càng nặng.
+- Chọn chế độ cho tất cả hoặc từng khung: Luyện Công, Nhiệm Vụ, Phó Bản, Leo Tháp, **Chạy tất cả** (Phó Bản → Nhiệm Vụ).
   Nhiệm Vụ / Phó Bản tự về Luyện Công khi hết việc; Leo Tháp tự vào lại khi gục ngã và dừng sau 3 lần chết liên tiếp.
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
 - **Bán đồ xanh** (thủ công + tự bán khi hành trang đầy), tùy chọn gồm cả đồ game đang giữ.

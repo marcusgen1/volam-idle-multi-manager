@@ -1,7 +1,7 @@
-// Máy chủ cục bộ cho trang quản lý 4 cửa sổ.
+// Máy chủ cục bộ cho trang quản lý nhiều cửa sổ game.
 //  - http://127.0.0.1:8800/            : trang quản lý (app.html)
-//  - http://127.0.0.1:8801 .. 8804     : chuyển tiếp tới https://volamidle.pages.dev
-// Mỗi cổng là một origin riêng nên localStorage / sessionStorage của 4 khung tách biệt nhau.
+//  - http://127.0.0.1:8801 .. 88xx     : chuyển tiếp tới https://volamidle.pages.dev (mỗi khung một cổng, mặc định 12 cổng)
+// Mỗi cổng là một origin riêng nên localStorage / sessionStorage của các khung tách biệt nhau.
 // Chỉ lắng nghe trên 127.0.0.1 (chỉ máy bạn truy cập được).
 // Nội dung chuyển tiếp không bị lưu lại. Điều duy nhất được thay đổi: trang HTML của game được chèn thêm
 // một dòng <script src="/__agent.js"> (file agent.js cạnh server này) để trang quản lý điều khiển chế độ.
@@ -12,7 +12,8 @@ const path = require("path");
 
 const TARGET_HOST = "volamidle.pages.dev";
 const BASE_PORT = 8800;
-const SLOTS = 4;
+// Số cổng khung mở sẵn = số khung tối đa thêm được. Đổi bằng biến môi trường, ví dụ: VL_SLOTS=8 npm start
+const SLOTS = Math.min(50, Math.max(1, parseInt(process.env.VL_SLOTS, 10) || 12));
 const BIND = "127.0.0.1";
 const AGENT_TAG = '<script src="/__agent.js"></script>';
 
@@ -77,8 +78,21 @@ function proxy(req, res, port) {
   req.pipe(up);
 }
 
+// Các cổng khung đã mở được (1 = BASE_PORT + 1 ...). Trang quản lý hỏi số này để biết thêm được tối đa bao nhiêu khung.
+const opened = new Set();
+function usableSlots() {
+  let n = 0;
+  while (opened.has(n + 1)) n++; // chỉ đếm các cổng liền nhau từ cổng đầu tiên
+  return n;
+}
+
 function dashboard(req, res) {
   const url = req.url.split("?")[0];
+  if (url === "/__config") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify({ base: BASE_PORT, max: usableSlots() }));
+    return;
+  }
   if (url !== "/" && url !== "/app.html") {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("Không có trang này");
@@ -87,12 +101,21 @@ function dashboard(req, res) {
   serveFile(res, "app.html", "text/html; charset=utf-8");
 }
 
-http.createServer(dashboard).listen(BASE_PORT, BIND, () => {
+const dash = http.createServer(dashboard);
+dash.on("error", (e) => {
+  console.error("Không mở được trang quản lý ở cổng " + BASE_PORT + ": " + e.message);
+  process.exit(1); // không có trang quản lý thì không có gì để chạy
+});
+dash.listen(BASE_PORT, BIND, () => {
   console.log("Trang quản lý: http://" + BIND + ":" + BASE_PORT + "/");
 });
 for (let i = 1; i <= SLOTS; i++) {
   const port = BASE_PORT + i;
-  http.createServer((req, res) => proxy(req, res, port)).listen(port, BIND, () => {
-    console.log("Cửa sổ " + i + " -> http://" + BIND + ":" + port + "/");
+  const srv = http.createServer((req, res) => proxy(req, res, port));
+  // Một cổng bị chương trình khác dùng thì chỉ bỏ cổng đó, các cổng còn lại vẫn chạy
+  srv.on("error", (e) => console.error("Cổng " + port + " không dùng được (" + e.code + "), bỏ qua khung " + i));
+  srv.listen(port, BIND, () => {
+    opened.add(i);
+    console.log("Khung " + i + " -> http://" + BIND + ":" + port + "/");
   });
 }

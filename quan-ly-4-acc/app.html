@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quản lý 4 nhân vật</title>
+<title>Quản lý nhân vật</title>
 <style>
   :root { --bg:#0e1412; --panel:#151d1a; --line:#2a3a34; --text:#e6e0d0; --dim:#8a9a92; --accent:#d8b04a; --ok:#6fcf8c; }
   * { box-sizing: border-box; }
@@ -18,12 +18,13 @@
   .grow { flex: 1; }
   button { background:#1d2a25; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 9px; font:inherit; cursor:pointer; }
   button:hover { border-color: var(--accent); }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  button:disabled:hover { border-color: var(--line); }
   button.on { background:#2b3d34; border-color:var(--accent); color:var(--accent); }
   button.sm { padding: 1px 7px; }
 
-  main { flex:1; min-height:0; display:grid; gap:5px; padding:5px; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
-  main.row { grid-template-columns: repeat(4, 1fr); grid-template-rows: 1fr; }
-  main.max { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+  /* Số cột / hàng được đặt bằng JS theo số khung */
+  main { flex:1; min-height:0; display:grid; gap:5px; padding:5px; }
   main.max .slot:not(.maxed) { display: none; }
 
   .slot { display:flex; flex-direction:column; min-width:0; min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:6px; overflow:hidden; }
@@ -40,28 +41,39 @@
   iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
   .off { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); background:#0a0f0d; }
   footer { padding:3px 10px; color:var(--dim); font-size:12px; border-top:1px solid var(--line); }
-  @media (max-width: 900px) { main, main.row { grid-template-columns:1fr; grid-template-rows:none; overflow-y:auto; } .slot { height:80vh; } }
+  @media (max-width: 900px) {
+    main { grid-template-columns:1fr !important; grid-template-rows:none !important; overflow-y:auto; }
+    .slot { height:80vh; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Quản lý 4 nhân vật</h1>
-  <div class="grp"><button id="lGrid" title="Bố cục 2×2">2×2</button><button id="lRow" title="4 cột cạnh nhau">4 cột</button></div>
+  <h1 id="title">Quản lý nhân vật</h1>
+  <div class="grp">
+    <button id="lGrid" title="Chia lưới (4 khung = 2×2)">Lưới</button>
+    <button id="lRow" title="Tất cả khung cạnh nhau trong một hàng">1 hàng</button>
+    <button id="addSlot" title="Thêm một khung game mới">＋ Thêm khung</button>
+  </div>
   <span class="sep"></span>
-  <div class="grp" id="allModes"><span>Cả 4:</span></div>
+  <div class="grp" id="allModes"><span>Tất cả:</span></div>
   <span class="grow"></span>
-  <button id="reloadAll" title="Tải lại cả 4 khung game">⟳ Tải lại</button>
+  <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </header>
 <main id="main"></main>
-<footer>
-  Nhiệm Vụ và Phó Bản: game tự về Luyện Công khi hết việc. Leo Tháp: gục ngã thì tự vào lại.
-  Mỗi khung chạy ở một cổng riêng (8801–8804) nên 4 tài khoản có phiên đăng nhập riêng. Trang này không lưu mật khẩu.
-</footer>
+<footer id="foot"></footer>
 
 <script>
-(() => {
-  const N = 4;
-  const BASE_PORT = 8800;
+(async () => {
+  // Cấu hình từ máy chủ: cổng gốc và số cổng đã mở (mỗi khung cần một cổng riêng). Máy chủ cũ không có thì mặc định 4.
+  let cfg = { base: 8800, max: 4 };
+  try {
+    const r = await fetch("/__config", { cache: "no-store" });
+    if (r.ok) cfg = Object.assign(cfg, await r.json());
+  } catch (e) {}
+  const BASE_PORT = cfg.base | 0 || 8800;
+  const MAX_SLOTS = Math.max(1, cfg.max | 0 || 4);
+
   const KEY = "quanly4acc.app.v2";
   const MODES = [
     ["farm", "⚔", "Luyện Công"],
@@ -70,38 +82,47 @@
     ["tower", "🗼", "Leo Tháp"],
   ];
   const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, m || "—"])[2];
-  const frameOrigin = (i) => location.protocol + "//" + location.hostname + ":" + (BASE_PORT + i + 1);
+
+  // Mỗi khung có một số cổng p cố định (cổng = BASE_PORT + p) nên phiên đăng nhập không bị lẫn khi thêm / xóa khung.
+  const frameOrigin = (i) => location.protocol + "//" + location.hostname + ":" + (BASE_PORT + state.slots[i].p);
   const frameUrl = (i) => frameOrigin(i) + "/";
 
   let state = {
     layout: "grid",
-    slots: Array.from({ length: N }, (_, i) => ({ label: "Tài khoản " + (i + 1), on: true, desired: null })),
+    slots: Array.from({ length: Math.min(4, MAX_SLOTS) }, (_, i) => ({ label: "Tài khoản " + (i + 1), on: true, desired: null, p: i + 1 })),
   };
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (s && Array.isArray(s.slots) && s.slots.length === N) state = s;
+    if (s && Array.isArray(s.slots) && s.slots.length >= 1) state = s;
   } catch (e) {}
+  // Dữ liệu cũ chưa có số cổng: khung thứ i dùng cổng i+1 như trước. Bỏ khung dư nếu máy chủ mở ít cổng hơn.
+  {
+    const used = new Set();
+    state.slots.forEach((s, i) => {
+      if (!(s.p >= 1) || used.has(s.p)) s.p = i + 1;
+      used.add(s.p);
+    });
+    state.slots = state.slots.filter((s) => s.p <= MAX_SLOTS);
+    if (!state.slots.length) state.slots = [{ label: "Tài khoản 1", on: true, desired: null, p: 1 }];
+  }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
 
   const main = document.getElementById("main");
   let maxed = -1;
-  const els = [];
-  const live = Array.from({ length: N }, () => ({ mode: null, ready: false }));
+  const els = []; // song song với state.slots
+  const live = []; // trạng thái nhận từ từng khung, song song với state.slots
 
-  function send(i, mode, restore) {
-    const f = els[i].iframe;
+  function post(i, msg) {
+    const f = els[i] && els[i].iframe;
     if (!f || !f.contentWindow) return;
-    try { f.contentWindow.postMessage({ vl: 1, type: "setMode", mode, restore: !!restore }, frameOrigin(i)); } catch (e) {}
+    try { f.contentWindow.postMessage(Object.assign({ vl: 1 }, msg), frameOrigin(i)); } catch (e) {}
   }
+  const send = (i, mode, restore) => post(i, { type: "setMode", mode, restore: !!restore });
 
   // Người nhận khi bấm "Gửi bình Phúc Duyên" (sửa ở đây nếu cần đổi)
   const PD_TO = "GiáoPháiĐạoÂm";
 
-  function sendPd(i, kind) {
-    const f = els[i].iframe;
-    if (!f || !f.contentWindow) return;
-    try { f.contentWindow.postMessage({ vl: 1, type: "pd", kind, to: PD_TO }, frameOrigin(i)); } catch (e) {}
-  }
+  const sendPd = (i, kind) => post(i, { type: "pd", kind, to: PD_TO });
   // Gửi thư là không hoàn tác được, nên luôn hỏi lại trước khi gửi
   function confirmSend(idxs) {
     if (!idxs.length) return false;
@@ -112,22 +133,9 @@
     );
   }
 
-  function sendSell(i) {
-    const f = els[i].iframe;
-    if (!f || !f.contentWindow) return;
-    try { f.contentWindow.postMessage({ vl: 1, type: "sell", kept: !!state.sellKept }, frameOrigin(i)); } catch (e) {}
-  }
-  function sendAutoSell(i) {
-    const f = els[i].iframe;
-    if (!f || !f.contentWindow) return;
-    try { f.contentWindow.postMessage({ vl: 1, type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept }, frameOrigin(i)); } catch (e) {}
-  }
-
-  function sendBoss(i) {
-    const f = els[i].iframe;
-    if (!f || !f.contentWindow) return;
-    try { f.contentWindow.postMessage({ vl: 1, type: "boss" }, frameOrigin(i)); } catch (e) {}
-  }
+  const sendSell = (i) => post(i, { type: "sell", kept: !!state.sellKept });
+  const sendAutoSell = (i) => post(i, { type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept });
+  const sendBoss = (i) => post(i, { type: "boss" });
 
   function setDesired(i, mode) {
     state.slots[i].desired = mode;
@@ -205,15 +213,17 @@
     }
   });
 
-  state.slots.forEach((s, i) => {
+  // ----- Tạo / xóa khung -----
+  function createSlot(s) {
     const slot = document.createElement("section");
     slot.className = "slot";
     slot.innerHTML =
-      '<div class="bar"><span class="num">' + (i + 1) + '</span>' +
-      '<input class="label" maxlength="40" aria-label="Tên khung ' + (i + 1) + '">' +
+      '<div class="bar"><span class="num"></span>' +
+      '<input class="label" maxlength="40">' +
       '<button class="sm" data-a="reload" title="Tải lại khung này">⟳</button>' +
       '<button class="sm" data-a="max" title="Phóng to / thu nhỏ">⛶</button>' +
-      '<button class="sm" data-a="power" title="Tắt / bật khung (giảm tải máy)">⏻</button></div>' +
+      '<button class="sm" data-a="power" title="Tắt / bật khung (giảm tải máy)">⏻</button>' +
+      '<button class="sm" data-a="del" title="Xóa khung này">✕</button></div>' +
       '<div class="modes">' +
       // Chỉ hiện biểu tượng cho gọn; rê chuột vào để xem tên nút
       MODES.map((m) => '<button class="sm" data-m="' + m[0] + '" title="' + m[2] + '" aria-label="' + m[2] + '">' + m[1] + '</button>').join("") +
@@ -230,35 +240,96 @@
     label.oninput = () => { s.label = label.value; save(); };
     const c = { slot, frame: slot.querySelector(".frame"), iframe: null, st: slot.querySelector(".st"), mbtns: [...slot.querySelectorAll("[data-m]")] };
     els.push(c);
-    c.mbtns.forEach((b) => (b.onclick = () => setDesired(i, b.dataset.m)));
-    slot.querySelector("[data-boss]").onclick = () => sendBoss(i);
-    slot.querySelector("[data-sell]").onclick = () => sendSell(i);
-    slot.querySelector("[data-pdd]").onclick = () => sendPd(i, "dong");
-    slot.querySelector("[data-pdg]").onclick = () => { if (confirmSend([i])) sendPd(i, "gui"); };
-    slot.querySelector('[data-a="reload"]').onclick = () => { if (s.on) mount(i, true); };
-    slot.querySelector('[data-a="max"]').onclick = () => { maxed = maxed === i ? -1 : i; applyLayout(); };
-    slot.querySelector('[data-a="power"]').onclick = () => { s.on = !s.on; save(); mount(i, s.on); };
-    mount(i, s.on);
-  });
+    live.push({ mode: null, ready: false });
+    // Chỉ số của khung có thể đổi khi xóa khung khác, nên luôn tra lại lúc bấm
+    const idx = () => els.indexOf(c);
+    c.mbtns.forEach((b) => (b.onclick = () => setDesired(idx(), b.dataset.m)));
+    slot.querySelector("[data-boss]").onclick = () => sendBoss(idx());
+    slot.querySelector("[data-sell]").onclick = () => sendSell(idx());
+    slot.querySelector("[data-pdd]").onclick = () => sendPd(idx(), "dong");
+    slot.querySelector("[data-pdg]").onclick = () => { const i = idx(); if (confirmSend([i])) sendPd(i, "gui"); };
+    slot.querySelector('[data-a="reload"]').onclick = () => { const i = idx(); if (state.slots[i].on) mount(i, true); };
+    slot.querySelector('[data-a="max"]').onclick = () => { const i = idx(); maxed = maxed === i ? -1 : i; applyLayout(); };
+    slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); };
+    slot.querySelector('[data-a="del"]').onclick = () => removeSlot(c);
+    mount(els.length - 1, s.on);
+    return c;
+  }
 
-  // Nút chọn chế độ cho cả 4 nhân vật
+  function addSlot() {
+    if (state.slots.length >= MAX_SLOTS) return;
+    const used = new Set(state.slots.map((s) => s.p));
+    let p = 1;
+    while (used.has(p)) p++;
+    if (p > MAX_SLOTS) return;
+    const s = { label: "Tài khoản " + (state.slots.length + 1), on: true, desired: null, p };
+    state.slots.push(s);
+    save();
+    createSlot(s);
+    afterCountChange();
+  }
+
+  function removeSlot(c) {
+    const i = els.indexOf(c);
+    if (i < 0 || els.length <= 1) return;
+    const s = state.slots[i];
+    if (!confirm(
+      "Xóa khung " + (i + 1) + " (" + (s.label || "Tài khoản") + ")?\n\nGame trong khung sẽ đóng lại. " +
+      "Phiên đăng nhập của khung này vẫn nằm trong trình duyệt (cổng " + (BASE_PORT + s.p) + "): nếu sau này thêm khung mới dùng lại cổng này, " +
+      "nó sẽ hiện lại tài khoản cũ."
+    )) return;
+    c.frame.textContent = ""; // dừng game trong khung
+    c.slot.remove();
+    els.splice(i, 1);
+    live.splice(i, 1);
+    state.slots.splice(i, 1);
+    if (maxed === i) maxed = -1;
+    else if (maxed > i) maxed--;
+    save();
+    afterCountChange();
+  }
+
+  function afterCountChange() {
+    const n = els.length;
+    document.getElementById("title").textContent = "Quản lý " + n + " nhân vật";
+    document.title = "Quản lý " + n + " nhân vật";
+    // Đánh số lại các khung theo thứ tự hiện tại
+    els.forEach((c, i) => {
+      c.slot.querySelector(".num").textContent = i + 1;
+      c.slot.querySelector(".label").setAttribute("aria-label", "Tên khung " + (i + 1));
+      c.slot.querySelector('[data-a="del"]').disabled = n <= 1;
+    });
+    const add = document.getElementById("addSlot");
+    add.disabled = n >= MAX_SLOTS;
+    add.title = n >= MAX_SLOTS ? "Đã đủ " + MAX_SLOTS + " khung (số cổng máy chủ đã mở)" : "Thêm một khung game mới (" + n + "/" + MAX_SLOTS + ")";
+    document.getElementById("foot").textContent =
+      "Nhiệm Vụ và Phó Bản: game tự về Luyện Công khi hết việc. Leo Tháp: gục ngã thì tự vào lại. " +
+      "Mỗi khung chạy ở một cổng riêng (" + (BASE_PORT + 1) + "–" + (BASE_PORT + MAX_SLOTS) + ") nên mỗi tài khoản có phiên đăng nhập riêng. " +
+      "Trang này không lưu mật khẩu.";
+    applyLayout();
+  }
+
+  state.slots.forEach(createSlot);
+
+  // ----- Nút điều khiển cho tất cả khung -----
   const allBox = document.getElementById("allModes");
+  const forOn = (fn) => state.slots.forEach((s, i) => s.on && fn(i));
   MODES.forEach((m) => {
     const b = document.createElement("button");
     b.textContent = m[1] + " " + m[2];
-    b.title = "Đặt cả 4 nhân vật sang " + m[2];
-    b.onclick = () => state.slots.forEach((s, i) => s.on && setDesired(i, m[0]));
+    b.title = "Đặt tất cả nhân vật sang " + m[2];
+    b.onclick = () => forOn((i) => setDesired(i, m[0]));
     allBox.appendChild(b);
   });
   const bossBtn = document.createElement("button");
   bossBtn.textContent = "👹 Boss tuần";
-  bossBtn.title = "Cả 4 nhân vật: tự khiêu chiến Boss tuần cho đến hết lượt (bấm lần nữa để dừng)";
-  bossBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendBoss(i));
+  bossBtn.title = "Tất cả nhân vật: tự khiêu chiến Boss tuần cho đến hết lượt (bấm lần nữa để dừng)";
+  bossBtn.onclick = () => forOn(sendBoss);
   allBox.appendChild(bossBtn);
   const sellBtn = document.createElement("button");
   sellBtn.textContent = "💰 Bán xanh";
-  sellBtn.title = "Cả 4 nhân vật: bán đồ xanh trong hành trang ngay bây giờ";
-  sellBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendSell(i));
+  sellBtn.title = "Tất cả nhân vật: bán đồ xanh trong hành trang ngay bây giờ";
+  sellBtn.onclick = () => forOn(sendSell);
   allBox.appendChild(sellBtn);
   const autoBtn = document.createElement("button");
   const renderAuto = () => {
@@ -270,7 +341,7 @@
     state.autoSell = !state.autoSell;
     save();
     renderAuto();
-    state.slots.forEach((s, i) => s.on && sendAutoSell(i));
+    forOn(sendAutoSell);
   };
   renderAuto();
   allBox.appendChild(autoBtn);
@@ -288,19 +359,19 @@
     )) { keptChk.checked = false; return; }
     state.sellKept = keptChk.checked;
     save();
-    if (state.autoSell) state.slots.forEach((s, i) => s.on && sendAutoSell(i));
+    if (state.autoSell) forOn(sendAutoSell);
   };
   keptLbl.appendChild(keptChk);
   keptLbl.appendChild(document.createTextNode("gồm đồ giữ"));
   allBox.appendChild(keptLbl);
   const dongBtn = document.createElement("button");
   dongBtn.textContent = "🎐 Đóng bình";
-  dongBtn.title = "Cả 4 nhân vật: đóng hết Phúc Duyên chờ đóng bình thành bình Đại / Trung / Tiểu";
-  dongBtn.onclick = () => state.slots.forEach((s, i) => s.on && sendPd(i, "dong"));
+  dongBtn.title = "Tất cả nhân vật: đóng hết Phúc Duyên chờ đóng bình thành bình Đại / Trung / Tiểu";
+  dongBtn.onclick = () => forOn((i) => sendPd(i, "dong"));
   allBox.appendChild(dongBtn);
   const guiBtn = document.createElement("button");
   guiBtn.textContent = "📨 Gửi bình";
-  guiBtn.title = "Cả 4 nhân vật: gửi thư hết bình Phúc Duyên Lộ Đại / Trung / Tiểu cho " + PD_TO;
+  guiBtn.title = "Tất cả nhân vật: gửi thư hết bình Phúc Duyên Lộ Đại / Trung / Tiểu cho " + PD_TO;
   guiBtn.onclick = () => {
     const idxs = state.slots.map((s, i) => (s.on ? i : -1)).filter((i) => i >= 0);
     if (confirmSend(idxs)) idxs.forEach((i) => sendPd(i, "gui"));
@@ -308,22 +379,31 @@
   allBox.appendChild(guiBtn);
   const comboBtn = document.createElement("button");
   comboBtn.textContent = "▶ Chạy hết";
-  comboBtn.title = "Cả 4 nhân vật: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công";
-  comboBtn.onclick = () => state.slots.forEach((s, i) => s.on && setDesired(i, "combo"));
+  comboBtn.title = "Tất cả nhân vật: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công";
+  comboBtn.onclick = () => forOn((i) => setDesired(i, "combo"));
   allBox.appendChild(comboBtn);
 
+  // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
   const lRow = document.getElementById("lRow");
   function applyLayout() {
-    main.className = maxed >= 0 ? "max" : state.layout === "row" ? "row" : "";
+    const n = els.length;
+    main.className = maxed >= 0 ? "max" : "";
+    let cols, rows;
+    if (maxed >= 0) { cols = 1; rows = 1; }
+    else if (state.layout === "row") { cols = n; rows = 1; }
+    else { cols = Math.min(n, Math.ceil(Math.sqrt(n))); rows = Math.ceil(n / cols); } // 4 khung = 2×2, 6 khung = 3×2, 9 khung = 3×3
+    main.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
+    main.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
     els.forEach((c, i) => c.slot.classList.toggle("maxed", i === maxed));
     lGrid.classList.toggle("on", state.layout !== "row");
     lRow.classList.toggle("on", state.layout === "row");
   }
   lGrid.onclick = () => { state.layout = "grid"; maxed = -1; save(); applyLayout(); };
   lRow.onclick = () => { state.layout = "row"; maxed = -1; save(); applyLayout(); };
+  document.getElementById("addSlot").onclick = addSlot;
   document.getElementById("reloadAll").onclick = () => state.slots.forEach((s, i) => s.on && mount(i, true));
-  applyLayout();
+  afterCountChange();
 })();
 </script>
 </body>
