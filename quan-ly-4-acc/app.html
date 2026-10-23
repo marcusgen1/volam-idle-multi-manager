@@ -150,8 +150,9 @@
     const l = live[i] || {};
     const name = (l.ready && l.hero) || s.hero || "";
     const lvl = (l.ready && l.lvl) || s.lvl || 0;
-    if (name) return name + (lvl ? " · Cấp " + lvl : "");
-    return (s.label || "Tài khoản " + (i + 1)) + (lvl ? " · Cấp " + lvl : "");
+    const money = (l.ready ? (l.gold ? " · 💰 " + l.gold : "") + (l.knb ? " · KNB " + l.knb : "") : "");
+    if (name) return name + (lvl ? " · Cấp " + lvl : "") + money;
+    return (s.label || "Tài khoản " + (i + 1)) + (lvl ? " · Cấp " + lvl : "") + money;
   }
 
   function refresh(i) {
@@ -216,7 +217,7 @@
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "" };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "" };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
