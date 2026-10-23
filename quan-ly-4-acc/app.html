@@ -40,6 +40,9 @@
   .frame { position:relative; flex:1; min-height:0; background:#000; }
   iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
   .off { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); background:#0a0f0d; }
+  #upd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:3px 10px; background:#2b2a14; border-bottom:1px solid var(--accent); color:var(--accent); font-size:12px; }
+  #upd[hidden] { display:none; }
+  #upd .why { color:var(--dim); flex:1 1 200px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   footer { padding:3px 10px; color:var(--dim); font-size:12px; border-top:1px solid var(--line); }
   @media (max-width: 900px) {
     main { grid-template-columns:1fr !important; grid-template-rows:none !important; overflow-y:auto; }
@@ -60,6 +63,12 @@
   <span class="grow"></span>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </header>
+<div id="upd" hidden>
+  <span id="updMsg"></span>
+  <span class="why" id="updWhy"></span>
+  <button id="updGo" class="sm" title="Tải bản mới từ GitHub (git pull) rồi tải lại trang">Cập nhật</button>
+  <button id="updLater" class="sm" title="Ẩn thông báo cho đến khi có bản mới hơn">Để sau</button>
+</div>
 <main id="main"></main>
 <footer id="foot"></footer>
 
@@ -416,6 +425,64 @@
   lGrid.onclick = () => { state.layout = "grid"; maxed = -1; save(); applyLayout(); };
   lRow.onclick = () => { state.layout = "row"; maxed = -1; save(); applyLayout(); };
   document.getElementById("addSlot").onclick = addSlot;
+  // --- Cập nhật từ GitHub: máy chủ tự kiểm tra, ở đây chỉ hỏi trạng thái và gửi lệnh cập nhật khi bạn bấm ---
+  (() => {
+    const box = document.getElementById("upd");
+    const msg = document.getElementById("updMsg");
+    const why = document.getElementById("updWhy");
+    const go = document.getElementById("updGo");
+    const later = document.getElementById("updLater");
+    const HDR = { "x-vl": "1" };
+    let dismissed = ""; // đã bấm "Để sau" cho bản nào
+    let working = false;
+
+    const render = (u) => {
+      const sig = u.behind + ":" + (u.commits[0] || "");
+      if (!u.supported || !u.behind || dismissed === sig) { box.hidden = true; return; }
+      box.hidden = false;
+      msg.textContent = "Có bản mới trên GitHub (" + u.behind + " thay đổi).";
+      why.textContent = (u.dirty ? "⚠ Bạn đang sửa file trong thư mục này, cập nhật có thể báo lỗi. " : "") + u.commits.join(" · ");
+      why.title = u.commits.join("\n");
+      go.dataset.sig = sig;
+    };
+    const poll = async () => {
+      if (working) return;
+      try {
+        const r = await fetch("/__update", { cache: "no-store" });
+        if (r.ok) render(await r.json());
+      } catch (e) {}
+    };
+    later.onclick = () => { dismissed = go.dataset.sig || ""; box.hidden = true; };
+    go.onclick = async () => {
+      if (!confirm("Cập nhật từ GitHub?\n\nTrang quản lý và các khung game sẽ được tải lại (chế độ đang chọn sẽ tự áp dụng lại).")) return;
+      working = true;
+      go.disabled = later.disabled = true;
+      msg.textContent = "Đang cập nhật…";
+      let err = "";
+      try {
+        const r = await fetch("/__update/apply", { method: "POST", headers: HDR });
+        const u = await r.json();
+        if (u.error) err = u.error;
+      } catch (e) {
+        // Máy chủ tự khởi động lại khi server.js đổi nên kết nối có thể đứt giữa chừng: đợi nó chạy lại rồi kiểm tra
+      }
+      for (let n = 0; n < 20; n++) {
+        await new Promise((ok) => setTimeout(ok, 1000));
+        try {
+          const u = await (await fetch("/__update", { cache: "no-store" })).json();
+          if (u.error) err = u.error;
+          if (!u.behind) { location.reload(); return; }
+          if (!u.busy) break;
+        } catch (e) {}
+      }
+      working = false;
+      go.disabled = later.disabled = false;
+      msg.textContent = "Cập nhật chưa thành công" + (err ? ": " + err : ".");
+    };
+    setTimeout(poll, 8000); // máy chủ kiểm tra lần đầu sau ~5 giây
+    setInterval(poll, 5 * 60 * 1000);
+  })();
+
   document.getElementById("reloadAll").onclick = () => state.slots.forEach((s, i) => s.on && mount(i, true));
   afterCountChange();
 })();
