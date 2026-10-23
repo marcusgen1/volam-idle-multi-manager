@@ -697,12 +697,13 @@
 
   // --- Tên nhân vật + cấp độ (để trang quản lý hiện làm tên khung) ---
   // Cấp độ: phần tử #lv luôn có trên màn hình. Tên nhân vật game không hiện cố định (ô "heroName" là tên phái),
-  // chỉ có trong thẻ Nhân vật (".u2nm", kèm nút bút chì ✎) nên đọc từ đó rồi nhớ lại, làm mới mỗi 5 phút.
+  // chỉ có trong thẻ Nhân vật (".u2nm", kèm nút bút chì ✎) nên đọc từ đó rồi nhớ lại. Chỉ đọc một lần sau khi đăng nhập xong.
   // Dự phòng: dòng "Tên · cấp N" của menu Hệ Thống. Nhân vật chưa đặt tên thì game hiện tên phái ở chỗ đó.
-  const HERO_REFRESH_MS = 300000;
   const HERO_RETRY_MS = 20000; // chưa đọc được thì thử lại sau bấy lâu
+  const HERO_MAX_TRIES = 5; // số lần đọc tối đa cho mỗi lần đăng nhập (tên không đọc được thì thôi, không bấm mãi)
   let heroName = "";
   let heroAt = 0;
+  let heroTries = 0;
   const readLevel = () => {
     const el = q("#lv");
     const n = el ? parseInt(el.textContent, 10) : NaN;
@@ -724,6 +725,7 @@
   };
   const peekHeroName = () => {
     heroAt = Date.now();
+    heroTries++;
     let name = readFromTab("char", () => {
       const el = q("#t-char .u2nm");
       if (!el) return "";
@@ -741,14 +743,19 @@
     if (name) heroName = name;
   };
   const heroTick = () => {
+    if (heroName || heroTries >= HERO_MAX_TRIES) return; // đã đọc rồi (hoặc bỏ cuộc): không đụng vào game nữa
     if (sellRun || bossRun || pdRun) return;
     const modal = q("#modal");
     if (modal && !modal.classList.contains("hidden")) return; // bạn đang dùng một cửa sổ
-    if (Date.now() - heroAt >= (heroName ? HERO_REFRESH_MS : HERO_RETRY_MS)) peekHeroName();
+    if (Date.now() - heroAt >= HERO_RETRY_MS) peekHeroName();
   };
 
   function tick() {
     if (!q("#mswMenu")) {
+      // Chưa đăng nhập / đã đăng xuất: quên tên cũ để lần đăng nhập sau (có thể là nhân vật khác) đọc lại
+      heroName = "";
+      heroAt = 0;
+      heroTries = 0;
       report(false);
       return;
     }
