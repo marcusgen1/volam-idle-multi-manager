@@ -9,6 +9,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { execFile } = require("child_process");
 
 const TARGET_HOST = "volamidle.pages.dev";
 const BASE_PORT = 8800;
@@ -86,8 +87,91 @@ function usableSlots() {
   return n;
 }
 
+// --- Cập nhật từ GitHub ---
+// Thư mục cha của quan-ly-4-acc là bản clone của repo. Máy chủ định kỳ "git fetch" xem có commit mới không;
+// có thì trang quản lý hiện thanh thông báo, bấm "Cập nhật" mới chạy "git pull --ff-only".
+// Không có git, hoặc thư mục không phải bản clone (tải zip) thì tính năng tự tắt, không ảnh hưởng gì khác.
+const REPO_DIR = path.join(__dirname, "..");
+const UPDATE_CHECK_MS = 3 * 60 * 60 * 1000; // 3 giờ kiểm tra một lần
+const update = { supported: false, behind: 0, commits: [], dirty: false, checkedAt: 0, error: "", busy: false, applied: false, output: "" };
+
+function git(args) {
+  return new Promise((resolve, reject) => {
+    execFile(
+      "git",
+      args,
+      { cwd: REPO_DIR, timeout: 60000, windowsHide: true, env: Object.assign({}, process.env, { GIT_TERMINAL_PROMPT: "0" }) },
+      (err, stdout, stderr) => (err ? reject(new Error((stderr || err.message).trim())) : resolve(String(stdout).trim()))
+    );
+  });
+}
+
+async function checkUpdate() {
+  if (update.busy) return;
+  update.busy = true;
+  try {
+    update.supported = (await git(["rev-parse", "--is-inside-work-tree"])) === "true";
+    if (!update.supported) return;
+    await git(["fetch", "--quiet", "origin"]);
+    const log = await git(["log", "--format=%s", "--max-count=5", "HEAD..@{u}"]);
+    update.behind = parseInt(await git(["rev-list", "--count", "HEAD..@{u}"]), 10) || 0;
+    update.commits = log ? log.split("\n") : [];
+    update.dirty = (await git(["status", "--porcelain", "--untracked-files=no"])) !== "";
+    update.error = "";
+  } catch (e) {
+    update.error = e.message.split("\n")[0];
+    if (/ENOENT/.test(e.message)) update.supported = false; // chưa cài git
+  } finally {
+    update.checkedAt = Date.now();
+    update.busy = false;
+  }
+}
+
+async function applyUpdate() {
+  if (update.busy || !update.supported || !update.behind) return;
+  update.busy = true;
+  try {
+    update.output = await git(["pull", "--ff-only", "--quiet"]);
+    update.applied = true;
+    update.error = "";
+  } catch (e) {
+    update.error = e.message.split("\n")[0];
+  } finally {
+    update.busy = false;
+  }
+  await checkUpdate();
+}
+
+// Chỉ nhận lệnh ghi từ chính trang quản lý: header tự đặt buộc trình duyệt kiểm tra CORS (trang web khác không gọi được),
+// kiểm tra thêm Host / Origin để chặn DNS rebinding.
+function trusted(req) {
+  const ok = new Set(["127.0.0.1:" + BASE_PORT, "localhost:" + BASE_PORT]);
+  if (!ok.has(String(req.headers.host))) return false;
+  if (req.headers.origin && !ok.has(String(req.headers.origin).replace(/^https?:\/\//, ""))) return false;
+  return req.headers["x-vl"] === "1";
+}
+
+function updateApi(req, res, url) {
+  const send = (code, obj) => {
+    res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify(obj));
+  };
+  if (req.method === "GET") return send(200, update);
+  if (req.method !== "POST" || !trusted(req)) return send(403, { error: "forbidden" });
+  if (url === "/__update/check") checkUpdate().then(() => send(200, update));
+  else if (url === "/__update/apply") applyUpdate().then(() => send(200, update));
+  else send(404, { error: "not found" });
+}
+
+setTimeout(() => checkUpdate(), 5000);
+setInterval(() => checkUpdate(), UPDATE_CHECK_MS).unref();
+
 function dashboard(req, res) {
   const url = req.url.split("?")[0];
+  if (url.startsWith("/__update")) {
+    updateApi(req, res, url);
+    return;
+  }
   if (url === "/__config") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     res.end(JSON.stringify({ base: BASE_PORT, max: usableSlots() }));

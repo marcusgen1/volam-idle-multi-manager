@@ -107,6 +107,16 @@ nên lần sau game nhớ đăng nhập. Phương án này không dùng trang qu
 | Trang trắng ở các khung game | Máy cần truy cập được `https://volamidle.pages.dev` (kiểm tra mạng / proxy) |
 | Dùng SSH tunnel mà khung game không tải | Thiếu cổng của khung đó (8801–8812) trong lệnh `ssh -L` |
 
+## Cập nhật từ GitHub
+
+Cần cài `git` và chạy từ bản clone (không phải tải zip); không thì tính năng này tự tắt.
+
+- **Khi khởi động**: `chay-quan-ly.sh` / `.bat` chạy `git pull --ff-only`. Lỗi mạng hoặc có sửa tay xung đột thì bỏ qua, vẫn chạy bản đang có.
+- **Khi đang chạy**: máy chủ `git fetch` sau 5 giây rồi cứ 3 giờ một lần. Có commit mới thì trang quản lý hiện thanh vàng
+  "Có bản mới trên GitHub", bấm **Cập nhật** để `git pull --ff-only` rồi tải lại trang (các khung game cũng tải lại), hoặc **Để sau**.
+- Lệnh cập nhật chỉ nhận từ chính trang quản lý (kiểm tra header, Host và Origin), trang web khác không gọi được.
+- Muốn cập nhật tay: `git pull` trong thư mục repo.
+
 ## Tính năng chính
 
 - **Thêm / xóa khung**: nút **＋ Thêm khung** ở đầu trang (tối đa bằng số cổng máy chủ mở, mặc định 12) và nút **✕** ở mỗi khung. Mỗi khung giữ một cổng cố định nên xóa một khung không làm mất phiên đăng nhập của khung khác. Muốn nhiều hoặc ít khung hơn: `VL_SLOTS=8 npm start`. Mỗi khung là một bản game chạy riêng nên càng nhiều khung máy càng nặng.
