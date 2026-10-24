@@ -129,7 +129,7 @@
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
     const ready = !!q("#mswMenu");
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", desired, next: queue[0] || null, note, boss: bossMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -424,6 +424,202 @@
     }
   }
 
+  // --- Bắt thú: đi tìm những loài thú chưa có trong Thú điển ---
+  // Thú không bắt bằng nút mà rơi ngẫu nhiên khi hạ quái là thú ngoài bãi luyện công (thường 0,1% · tinh anh 1% · trùm 8%),
+  // nên "đi bắt" = đứng ở bãi có loài còn thiếu và luyện công. Mỗi vòng: đọc Thú điển (cửa sổ Đồng hành > Thú điển, ô mờ
+  // "???" là loài chưa có), tra loài nào ở bãi nào bằng window.JX_FEED.pets của game, chọn bãi mở được có nhiều loài thiếu
+  // nhất, chuyển tới đó (Bản đồ luyện công), rồi chờ cho đến khi nhật ký game báo có loài mới (hoặc mỗi vài phút) để tính lại.
+  // Dừng khi đủ Thú điển, khi các loài còn thiếu đều ở bãi chưa mở / chưa đủ cấp, hoặc khi bạn bấm nút lần nữa.
+  const PET_RECHECK_MS = 180000; // không có tin gì mới thì vẫn đọc lại Thú điển sau bấy lâu
+  const PET_LOG_MARK = "Thú điển"; // dòng nhật ký khi có loài mới: "… loài mới trong Thú điển" / "(ghi vào Thú điển)"
+  let petMsg = "";
+  let petRun = false;
+  let petCancel = false;
+  let petUi = false; // đang mở cửa sổ game để đọc / chọn: các việc nền khác nhường
+  const waitPet = async (ms) => {
+    for (let t = 0; t < ms && !petCancel; t += 500) await wait(500);
+  };
+  const modalOpen = () => {
+    const m = q("#modal");
+    return !!m && !m.classList.contains("hidden");
+  };
+  // Đọc Thú điển: trả về { total, got, missing: [chỉ số loài thiếu] } hoặc { err }. Thứ tự ô = thứ tự JX_FEED.pets.
+  async function petReadDex() {
+    if (!q("#mswMenu")) return { err: "chưa vào game" };
+    for (let n = 0; n < 60 && modalOpen() && !petCancel; n++) await wait(1000); // bạn đang dùng một cửa sổ: chờ
+    if (petCancel) return { err: "đã dừng" };
+    if (modalOpen()) return { err: "đang mở cửa sổ khác quá lâu" };
+    petUi = true;
+    try {
+      const btn = q("#u20pet");
+      if (!btn) return { err: "không thấy nút Đồng hành" };
+      btn.click();
+      const tab = await waitFor(() => q('.ptabs [data-ptab="dex"]'), 5000);
+      if (!tab) {
+        closeModalBtn();
+        return { err: "không mở được Đồng hành (chưa mở khóa hoặc cần đăng nhập)" };
+      }
+      tab.click();
+      await wait(400);
+      const cells = qa("#mBody .pdx:not(.rare)");
+      closeModalBtn();
+      const pets = (window.JX_FEED && window.JX_FEED.pets) || [];
+      if (!cells.length) return { err: "không đọc được Thú điển" };
+      if (cells.length !== pets.length) return { err: "danh sách thú của game (" + pets.length + ") lệch Thú điển (" + cells.length + ")" };
+      const missing = [];
+      cells.forEach((el, i) => el.classList.contains("off") && missing.push(i));
+      return { total: cells.length, got: cells.length - missing.length, missing };
+    } finally {
+      petUi = false;
+    }
+  }
+  // Danh sách bãi luyện công trong giao diện: tên bãi -> { row, alt, locked }. Bãi có nhiều bản đồ thì mỗi bản đồ là một nút nhỏ
+  // (data-za="chỉ số bãi:số bản đồ") đứng sau hàng của bãi; chưa mở bãi thì hàng bị khóa.
+  const readZones = () => {
+    const zones = new Map();
+    qa(".zrow[data-z]").forEach((row) => {
+      const c = row.dataset.z;
+      const next = row.nextElementSibling;
+      const chips = next && next.classList.contains("zalt") ? qa('.zalt [data-za^="' + c + ':"]').filter((b) => next.contains(b)) : [];
+      const add = (name, alt) => {
+        name = String(name || "").replace(/^[^\p{L}\p{N}]+/u, "").trim(); // bỏ biểu tượng đứng trước tên (bố cục khác của game)
+        if (name && !zones.has(name)) zones.set(name, { c, alt, locked: row.disabled });
+      };
+      if (chips.length) chips.forEach((b) => add(b.textContent, b.dataset.za));
+      else add((row.querySelector("b") || {}).textContent, null);
+    });
+    return zones;
+  };
+  async function getZones() {
+    let z = readZones();
+    if (z.size) return z;
+    const prev = activeTab();
+    const tab = q('#tabs button[data-t="log"]');
+    if (tab) {
+      tab.click();
+      await wait(500);
+      z = readZones();
+      restoreTab(prev);
+    }
+    return z;
+  }
+  // Đang đứng ở bãi/bản đồ này không: hàng của bãi có lớp "cur", nút bản đồ có lớp "on". Không thấy danh sách thì xem nhãn bãi.
+  const zoneHere = (z, name) => {
+    const cur = q(".zrow.cur");
+    if (!cur) {
+      const lbl = q("#stageLbl");
+      return !!lbl && lbl.textContent.indexOf(name) >= 0;
+    }
+    if (cur.dataset.z !== z.c) return false;
+    if (!z.alt) return true;
+    const chip = q('[data-za="' + z.alt + '"]');
+    return !!chip && chip.classList.contains("on");
+  };
+  // Chọn bãi: bấm hàng của bãi rồi (nếu có nhiều bản đồ) nút bản đồ. Giao diện được vẽ lại sau mỗi lần bấm nên tìm lại nút.
+  async function goZone(name) {
+    const z = (await getZones()).get(name);
+    if (!z || z.locked) return false;
+    if (zoneHere(z, name)) return true; // đang đứng ở đó
+    const row = q('.zrow[data-z="' + z.c + '"]');
+    if (!row) return false;
+    row.click();
+    await wait(500);
+    if (z.alt) {
+      const chip = q('[data-za="' + z.alt + '"]');
+      if (chip) {
+        chip.click();
+        await wait(500);
+      }
+    }
+    return zoneHere(z, name);
+  }
+  // Chọn bãi có nhiều loài thiếu nhất trong số bãi đã mở. Trả về { name, n } hoặc { none: số loài chưa tới được }
+  async function petPlan(missing) {
+    const pets = window.JX_FEED.pets;
+    const zones = await getZones();
+    if (!zones.size) return { err: "không thấy danh sách Bản đồ luyện công (thử mở thẻ Màn chơi)" };
+    const score = new Map(); // tên bãi -> số loài thiếu có ở đó
+    let reachable = 0;
+    for (const idx of missing) {
+      let ok = false;
+      for (const raw of pets[idx][2] || []) {
+        const name = String(raw).replace(/\s*\(\d+\s*-\s*\d+\)\s*$/, "").trim();
+        const z = zones.get(name);
+        if (!z || z.locked) continue;
+        ok = true;
+        score.set(name, (score.get(name) || 0) + 1);
+      }
+      if (ok) reachable++;
+    }
+    if (!score.size) return { none: missing.length };
+    let best = null;
+    for (const [name, n] of score) {
+      const here = zoneHere(zones.get(name), name);
+      if (!best || n > best.n || (n === best.n && here)) best = { name, n, here };
+    }
+    return { name: best.name, n: best.n, reachable, left: missing.length - reachable };
+  }
+  async function runPet() {
+    if (petRun) {
+      petCancel = true; // bấm lần nữa = dừng
+      return;
+    }
+    petRun = true;
+    petCancel = false;
+    petMsg = "Bắt thú: đang đọc Thú điển…";
+    // Đứng ở chế độ Luyện Công (chọn bãi cũng tự chuyển về đó); các chế độ khác sẽ làm hỏng việc chọn bãi
+    queue = [];
+    desired = "farm";
+    applied = false;
+    report(true, true);
+    try {
+      while (!petCancel) {
+        const dex = await petReadDex();
+        if (dex.err) {
+          petMsg = "Bắt thú: " + dex.err;
+          break;
+        }
+        if (!dex.missing.length) {
+          petMsg = "Bắt thú: đã đủ Thú điển (" + dex.got + "/" + dex.total + " loài)";
+          break;
+        }
+        const plan = await petPlan(dex.missing);
+        if (plan.err) {
+          petMsg = "Bắt thú: " + plan.err;
+          break;
+        }
+        if (plan.none) {
+          petMsg = "Bắt thú: còn " + plan.none + " loài thiếu đều ở bãi chưa mở / chưa đủ cấp (đã có " + dex.got + "/" + dex.total + ")";
+          break;
+        }
+        if (!(await goZone(plan.name))) {
+          petMsg = "Bắt thú: không chuyển được tới bãi " + plan.name;
+          break;
+        }
+        const info = "đã có " + dex.got + "/" + dex.total + " · " + plan.name + " (" + plan.n + " loài thiếu)" + (plan.left ? " · " + plan.left + " loài ở bãi chưa mở" : "");
+        petMsg = "Bắt thú: " + info;
+        report(true);
+        const base = countLog(PET_LOG_MARK);
+        const t0 = Date.now();
+        while (!petCancel && Date.now() - t0 < PET_RECHECK_MS && countLog(PET_LOG_MARK) === base) {
+          await wait(1000);
+          if (!q("#mswMenu")) {
+            petMsg = "Bắt thú: mất kết nối game, đã dừng";
+            petCancel = true;
+          }
+        }
+      }
+      if (petCancel && !/mất kết nối/.test(petMsg)) petMsg = "Bắt thú: đã dừng";
+    } catch (err) {
+      petMsg = "Bắt thú: lỗi " + (err && err.message ? err.message : err);
+    } finally {
+      petRun = false;
+      petCancel = false;
+      petUi = false;
+      report(true);
+    }
+  }
+
   // --- Bán đồ xanh trong Hành trang (thủ công + tự động khi hành trang đầy) ---
   // Dùng đúng màn "🧹 Dọn kho" của game: chỉ bật "Bán đồ xanh" ở Hành trang, bấm "Dọn ngay". Game tự giữ lại món khóa 🔒,
   // đồ đang mặc / tốt hơn đồ đang mặc, đồ cần cho Dã Tẩu, đồ trong Rương Chứa Đồ và đồ xanh bạn đã đặt "giữ" (Trợ Thủ › Nhặt đồ).
@@ -599,7 +795,7 @@
     return r;
   }
   async function autoSellTick() {
-    if (!autoSell || sellRun || bossRun || pdRun) return;
+    if (!autoSell || sellRun || bossRun || pdRun || petUi) return;
     if (!q("#mswMenu")) return;
     const modal = q("#modal");
     if (modal && !modal.classList.contains("hidden")) return; // bạn đang dùng một cửa sổ
@@ -622,6 +818,10 @@
       runBoss();
       return;
     }
+    if (m && m.vl === 1 && m.type === "pet") {
+      runPet();
+      return;
+    }
     if (m && m.vl === 1 && m.type === "sell") {
       runSell(false, !!m.kept);
       return;
@@ -641,6 +841,7 @@
     }
     if (!m || m.vl !== 1 || m.type !== "setMode") return;
     if (m.mode !== null && !MODES.includes(m.mode)) return;
+    if (petRun && !m.restore && m.mode !== "farm") petCancel = true; // bạn chọn chế độ khác: dừng đi bắt thú
     queue = [];
     note = "";
     if (m.mode === "combo") {
@@ -730,7 +931,7 @@
   };
   const heroTick = () => {
     if (heroName || heroTries >= HERO_MAX_TRIES) return; // đã đọc rồi (hoặc bỏ cuộc): không đụng vào game nữa
-    if (sellRun || bossRun || pdRun) return;
+    if (sellRun || bossRun || pdRun || petUi) return;
     const modal = q("#modal");
     if (modal && !modal.classList.contains("hidden")) return; // bạn đang dùng một cửa sổ
     if (Date.now() - heroAt >= HERO_RETRY_MS) peekHeroName();
