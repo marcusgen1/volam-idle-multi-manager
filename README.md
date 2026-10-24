@@ -115,6 +115,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Khi đang chạy**: máy chủ `git fetch` sau 5 giây rồi cứ 3 giờ một lần. Có commit mới thì trang quản lý hiện thanh vàng
   "Có bản mới trên GitHub", bấm **Cập nhật** để `git pull --ff-only` rồi tải lại trang (các khung game cũng tải lại), hoặc **Để sau**.
 - Lệnh cập nhật chỉ nhận từ chính trang quản lý (kiểm tra header, Host và Origin), trang web khác không gọi được.
+- Nút **⬆ Cập nhật** ở đầu trang: kiểm tra GitHub ngay (không cần chờ thông báo); có bản mới thì hỏi xác nhận rồi cập nhật, không thì báo "đang dùng bản mới nhất" hoặc lý do không kiểm tra được.
 - Muốn cập nhật tay: `git pull` trong thư mục repo.
 
 ## Tính năng chính
