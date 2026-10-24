@@ -574,11 +574,11 @@
   };
 
   function logSample(i, l) {
-    if (!l.ready) return;
+    if (!l.ready || !l.hero) return; // chưa đọc được tên nhân vật thì chưa biết ghi cho ai: bỏ qua, không ghi vào "Khung N"
     const lvl = l.lvl | 0, gold = parseGold(l.gold), knb = parseKnb(l.knb);
     const tw = l.tower | 0;
     if (!(lvl > 0) || gold == null || knb == null) return;
-    const c = logChar(logKey(i));
+    const c = logChar(l.hero);
     const d = logDay(c, vnDay());
     const last = c.last;
     if (!d.lv0) d.lv0 = lvl;

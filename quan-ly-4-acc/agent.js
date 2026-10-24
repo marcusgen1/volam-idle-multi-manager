@@ -129,7 +129,8 @@
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
     const ready = !!q("#mswMenu");
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", tower: ready ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const ok = ready && charLoaded(); // chưa vào nhân vật thì các số trên thanh trên còn là mặc định (cấp 1, 0 lượng), không báo
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ok ? readLevel() : 0, gold: ok ? readText("#gold") : "", knb: ok ? readText("#knbTop") : "", tower: ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -993,6 +994,11 @@
     const el = q(sel);
     return el ? el.textContent.trim() : "";
   };
+  // Đã vào nhân vật chưa: nút chế độ của game ẩn cho tới khi nhân vật được nạp (khi đó thanh trên mới có số thật)
+  const charLoaded = () => {
+    const m = q("#modeSw");
+    return !!m && !m.classList.contains("hidden");
+  };
   const readLevel = () => {
     const el = q("#lv");
     const n = el ? parseInt(el.textContent, 10) : NaN;
@@ -1032,7 +1038,8 @@
     if (name) heroName = name;
   };
   const heroTick = () => {
-    if (heroName || heroTries >= HERO_MAX_TRIES) return; // đã đọc rồi (hoặc bỏ cuộc): không đụng vào game nữa
+    if (heroName || heroTries >= HERO_MAX_TRIES) return;
+    if (!charLoaded()) return; // chưa nạp nhân vật: chưa đọc, cũng chưa tính vào số lần thử // đã đọc rồi (hoặc bỏ cuộc): không đụng vào game nữa
     if (sellRun || bossRun || pdRun || petUi) return;
     const modal = q("#modal");
     if (modal && !modal.classList.contains("hidden")) return; // bạn đang dùng một cửa sổ
