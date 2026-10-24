@@ -250,7 +250,7 @@
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", tower: m.tower | 0 };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", goldN: m.goldN, knbN: m.knbN, tower: m.tower | 0 };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pet", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
@@ -532,8 +532,8 @@
   // --- Nhật ký hoạt động ---
   // Số liệu theo nhân vật (khóa = tên nhân vật), lưu trong localStorage của trình duyệt này, giữ 14 ngày gần nhất:
   //  - cấp tăng trong ngày: cộng các lần cấp tăng (đọc từ thanh trên của game)
-  //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Game chỉ hiện số rút gọn
-  //    ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
+  //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Số đọc từ bản lưu của game
+  //    (chính xác); không đọc được thì dùng chữ rút gọn trên thanh trên ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
   //  - tầng tháp leo được trong ngày: cộng phần tầng tăng so với tầng thấy lần trước, ra khỏi tháp vào lại thì đếm tiếp (đọc từ tên bãi trên thanh trên của game)
   //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã)
   // Ngày tính theo giờ Việt Nam (GMT+7) như game.
@@ -574,11 +574,11 @@
   };
 
   function logSample(i, l) {
-    if (!l.ready) return;
-    const lvl = l.lvl | 0, gold = parseGold(l.gold), knb = parseKnb(l.knb);
+    if (!l.ready || !l.hero) return; // chưa đọc được tên nhân vật thì chưa biết ghi cho ai: bỏ qua, không ghi vào "Khung N"
+    const lvl = l.lvl | 0, gold = typeof l.goldN === "number" ? l.goldN : parseGold(l.gold), knb = typeof l.knbN === "number" ? l.knbN : parseKnb(l.knb);
     const tw = l.tower | 0;
     if (!(lvl > 0) || gold == null || knb == null) return;
-    const c = logChar(logKey(i));
+    const c = logChar(l.hero);
     const d = logDay(c, vnDay());
     const last = c.last;
     if (!d.lv0) d.lv0 = lvl;

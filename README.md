@@ -135,7 +135,9 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, số tầng tháp leo được, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
   số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã; đổi mẫu nhận diện ở
   `LOG_NOTABLE` trong `agent.js`); có sự kiện mới thì hiện thông báo nhỏ ở góc dưới phải. Số liệu lưu trong `localStorage` của trình duyệt.
-  Ngân lượng / KNB lấy từ số rút gọn trên thanh trên của game nên có sai số nhỏ ở số lớn; "kiếm" cộng các lần số tăng, "chi" cộng các lần giảm.
+  Cấp, ngân lượng, KNB, tầng tháp và tên nhân vật đọc từ bản lưu của chính game (localStorage của khung, game ghi mỗi ~10 giây, chỉ đọc không ghi)
+  nên chính xác và vẫn cập nhật khi trang ở tab nền; thanh trên của game chỉ được vẽ lại khi khung đang được nhìn thấy. "Kiếm" cộng các lần số tăng,
+  "chi" cộng các lần giảm. Tầng tháp tính theo mốc tầng game lưu (tăng dần mỗi tầng qua, ra / vào tháp vẫn giữ).
   Dòng nhật ký chỉ có khi khung thông báo của game ở tab **Hệ thống**: lần đầu sau khi tải khung script tự bấm sang tab đó một lần.
 - Bố cục 2×2 hoặc 4 cột, phóng to / tắt từng khung. **Dùng bố cục 2×2 khi chạy Nhiệm Vụ**: ở 4 cột game không vẽ khung
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ. Vì vậy khi chọn Nhiệm Vụ, Phó Bản hoặc Chạy tất cả mà đang ở bố cục 1 hàng, trang tự chuyển về lưới.
