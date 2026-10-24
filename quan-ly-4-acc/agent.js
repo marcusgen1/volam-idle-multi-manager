@@ -263,9 +263,8 @@
     }
   }
 
-  // --- Bình Phúc Duyên Lộ: đóng hết Phúc Duyên chờ đóng bình / gửi thư hết bình cho một người ---
-  // Dùng đúng cửa sổ "Bình Phúc Duyên Lộ" của game: [Đóng hết], rồi với từng loại bình bấm [Gửi / Bán],
-  // nhập số bình + tên người nhận, bấm [Gửi thư]. Bình Đại gửi trước, rồi Trung, rồi Tiểu.
+  // --- Phúc Duyên: đóng bình / dùng hết bình trong hành trang / mở hết rương trong Phần thưởng ---
+  // Bấm đúng các nút có sẵn trong cửa sổ "Bình Phúc Duyên Lộ" và 🎁 Phần thưởng của game.
   let pdMsg = "";
   let pdRun = false;
   const qa = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
@@ -336,105 +335,87 @@
     return "đã đóng · trước: " + before + " → sau: " + after;
   }
 
-  // Gửi thư MỘT lần kèm cả 3 loại bình: mở Hộp thư, chọn các ô bình Phúc Duyên Lộ (Đại / Trung / Tiểu) trong phần
-  // "Kèm món đồ", nhập tên người nhận, bấm [Gửi thư] rồi xác nhận hộp thoại của game. Mỗi thư tối đa 10 ô nên
-  // nếu có hơn 10 ô bình thì gửi thêm thư.
-  const PD_ICON = { 3: "Đại", 2: "Trung", 1: "Tiểu" };
-  const bottleKind = (el) => {
-    const im = el.querySelector("img");
-    const m = im && (im.getAttribute("src") || "").match(/fdl([123])\.png/);
-    return m ? +m[1] : 0;
-  };
   const closeModalBtn = () => {
     const c = q("#mClose");
     if (c) c.click();
   };
-  async function openMail() {
-    if (q("#nmInv")) return "";
+
+  // Dùng hết bình Phúc Duyên Lộ trong hành trang. Cửa sổ "Bình Phúc Duyên Lộ" có sẵn nút [Dùng hết] cho từng loại bình
+  // (nút cuối của hàng); riêng khi chỉ còn 1 bình thì nút đó bị khóa, nên bấm nút [Dùng 1]. Bình Đại dùng trước.
+  // Mỗi vòng bấm xong cả 3 loại rồi tải lại số bình; còn bình (nút còn bận) thì vòng sau bấm tiếp, tối đa 5 vòng.
+  async function pdDung() {
+    const err = await openPdl();
+    if (err) return err;
+    await refreshPdl();
+    const total = () => bottleCount(1) + bottleCount(2) + bottleCount(3);
+    const before = pdlSummary();
+    if (!total()) {
+      closePdl();
+      return "hành trang không có bình Phúc Duyên Lộ nào";
+    }
+    for (let round = 0; round < 5 && total(); round++) {
+      for (const kind of [3, 2, 1]) {
+        const btns = qa('#pdlBox [data-pu="' + kind + '"]').filter((b) => !b.disabled);
+        const btn = btns[btns.length - 1];
+        if (!btn) continue;
+        btn.click();
+        await wait(1500);
+      }
+      await refreshPdl();
+    }
+    const after = pdlSummary();
+    closePdl();
+    return (total() ? "chưa dùng hết · " : "đã dùng · ") + "trước: " + before + " → sau: " + after;
+  }
+
+  // Mở hết rương Phúc Duyên: 🎁 Phần thưởng > Phúc Duyên > [Mở hết (N)] (mỗi rương 10 điểm). Có đúng 1 rương thì
+  // nút [Mở hết] bị khóa nên bấm [Mở ×1]. Mở nhiều rương thì game hiện cửa sổ kết quả (có nút Quay lại), đọc tóm tắt từ đó.
+  async function pdMo() {
     if (!q("#mswMenu")) return "Chưa vào game";
     const modal = q("#modal");
     if (modal && !modal.classList.contains("hidden")) return "đang mở cửa sổ khác, thử lại sau";
-    const btn = q("#u20mail");
-    if (btn) btn.click();
-    else window.dispatchEvent(new KeyboardEvent("keydown", { key: "F6", bubbles: true })); // phím tắt mở Hộp thư
-    const ok = await waitFor(() => q("#nmInv"), 8000);
-    return ok ? "" : toastText() || "không mở được Hộp thư (cần đăng nhập máy chủ)";
-  }
-  async function pdGui(to) {
-    to = String(to || "").trim();
-    if (!to || to.length > 14) return "tên người nhận không hợp lệ";
-    const err = await openMail();
-    if (err) return err;
-    const sent = []; // mỗi phần tử: danh sách loại bình trong một thư
-    let stop = "";
-    for (let round = 0; round < 6; round++) {
-      const tiles = qa("#nmInv [data-uid]");
-      const bottles = tiles.filter((el) => bottleKind(el) > 0).slice(0, 10);
-      if (!bottles.length) break;
-      // Chỉ chọn các ô bình; bỏ chọn mọi món khác (game giữ lại lựa chọn cũ giữa các lần mở)
-      for (const el of tiles) {
-        const want = bottles.indexOf(el) >= 0;
-        if (el.classList.contains("ep-on") !== want) el.click();
-      }
-      const picked = tiles.filter((el) => el.classList.contains("ep-on"));
-      if (picked.length !== bottles.length || picked.some((el) => bottleKind(el) === 0)) {
-        stop = "không chọn đúng các ô bình trong thư";
-        break;
-      }
-      const gd = q("#nmGdOn");
-      if (gd && gd.checked) gd.click(); // không dùng "thư giao dịch"
-      const toInp = q("#nmTo");
-      const send = q("#nmSend");
-      if (!toInp || !send) {
-        stop = "không thấy ô nhập người nhận / nút Gửi thư";
-        break;
-      }
-      toInp.value = to;
-      toInp.dispatchEvent(new Event("input", { bubbles: true }));
-      const note = q("#nmNote");
-      if (note) note.value = "";
-      const gold = q("#nmGold");
-      if (gold) gold.value = "";
-      send.click();
-      // Game hỏi lại "Gửi ... cho <tên>?". Chỉ xác nhận nếu đúng người nhận.
-      const ask = await waitFor(() => q("#askBox"), 4000);
-      if (!ask) {
-        stop = toastText() || "game không hiện hộp xác nhận gửi";
-        break;
-      }
-      if (ask.textContent.indexOf(to) < 0) {
-        const cancel = ask.querySelector('[data-a="0"]');
-        if (cancel) cancel.click();
-        stop = "hộp xác nhận của game không đúng người nhận, đã hủy";
-        break;
-      }
-      const yes = ask.querySelector('[data-a="1"]');
-      if (yes) yes.click();
-      // Thành công: game vẽ lại Hộp thư nên các ô cũ biến mất khỏi trang
-      const gone = await waitFor(() => !bottles[0].isConnected, 12000);
-      if (!gone) {
-        stop = "gửi thư không thành công: " + (toastText() || "không rõ lý do");
-        break;
-      }
-      sent.push(Array.from(new Set(bottles.map(bottleKind))).sort((a, b) => b - a));
-      await wait(500);
+    const gift = q("#giftBtn");
+    if (!gift) return "không thấy nút Phần thưởng";
+    gift.click();
+    const tab = await waitFor(() => q('#giftTabs [data-g="chest"]'), 5000);
+    if (!tab) {
+      closeModalBtn();
+      return "không mở được cửa sổ Phần thưởng";
+    }
+    tab.click();
+    await wait(400);
+    const all = q('#mBody [data-ch="999999"]');
+    const one = q("#gChest");
+    const body = q("#mBody");
+    const fd = (body && body.textContent.match(/Điểm Phúc Duyên:\s*(\d+)/)) || [];
+    let out;
+    if (all && !all.disabled) {
+      const n = digits((all.textContent.match(/\((\d+)\)/) || [])[1]);
+      all.click();
+      const done = await waitFor(() => q("#cBack"), 20000);
+      const card = q("#mBody .card.stats");
+      const sum = card ? Array.from(card.children).reduce((a, el, i) => a + (i % 2 ? " " : (a ? " · " : "")) + el.textContent.trim(), "") : "";
+      out = done ? "đã mở " + n + " rương" + (sum ? " · " + sum : "") : toastText() || "không rõ kết quả (kiểm tra lại trong game)";
+    } else if (one && !one.disabled) {
+      one.click();
+      await wait(1500);
+      out = "đã mở 1 rương" + (toastText() ? " · " + toastText() : "");
+    } else {
+      out = "chưa đủ Phúc Duyên để mở rương (cần từ 10" + (fd[1] ? ", đang có " + fd[1] : "") + ")";
     }
     closeModalBtn();
-    const kinds = (arr) => arr.map((k) => PD_ICON[k]).join(" + ");
-    const sentTxt = sent.map((k) => "1 thư (" + kinds(k) + ")").join(", ");
-    if (stop) return (sent.length ? "đã gửi " + sentTxt + " · " : "") + stop;
-    return sent.length
-      ? "đã gửi " + sentTxt + " cho " + to
-      : "không thấy bình Phúc Duyên Lộ nào trong hành trang / màn soạn thư";
+    return out;
   }
-  async function runPd(kind, to) {
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo };
+  async function runPd(kind) {
     if (pdRun) return;
     pdRun = true;
-    pdMsg = kind === "gui" ? "Gửi bình Phúc Duyên: đang gửi…" : "Đóng bình Phúc Duyên: đang đóng…";
+    pdMsg = PD_NAME[kind] + ": đang chạy…";
     report(true);
     try {
-      const r = kind === "gui" ? await pdGui(to) : await pdDong();
-      pdMsg = (kind === "gui" ? "Gửi bình Phúc Duyên: " : "Đóng bình Phúc Duyên: ") + r;
+      const r = await PD_RUN[kind]();
+      pdMsg = PD_NAME[kind] + ": " + r;
     } catch (err) {
       pdMsg = "Phúc Duyên: lỗi " + (err && err.message ? err.message : err);
     } finally {
@@ -655,7 +636,7 @@
       return;
     }
     if (m && m.vl === 1 && m.type === "pd") {
-      runPd(m.kind === "gui" ? "gui" : "dong", m.to);
+      if (PD_RUN[m.kind]) runPd(m.kind);
       return;
     }
     if (!m || m.vl !== 1 || m.type !== "setMode") return;
