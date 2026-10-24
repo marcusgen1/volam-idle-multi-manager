@@ -134,11 +134,24 @@
   const sendAutoSell = (i) => post(i, { type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept });
   const sendBoss = (i) => post(i, { type: "boss" });
 
+  // Nhiệm Vụ / Phó Bản (kể cả Chạy tất cả) cần khung đủ rộng để game vẽ khung "Theo Dấu": bố cục 1 hàng làm khung
+  // quá hẹp nên tự chuyển về lưới. Chỉ đổi từ 1 hàng sang lưới, không đụng tới khung đang phóng to.
+  const needsGrid = (mode) => mode === "quest" || mode === "dg" || mode === "combo";
+  function ensureGrid(mode) {
+    if (!needsGrid(mode) || state.layout !== "row") return;
+    state.layout = "grid";
+    save();
+    applyLayout();
+  }
+
   function setDesired(i, mode) {
     state.slots[i].desired = mode;
     save();
     refresh(i);
-    if (state.slots[i].on) send(i, mode);
+    if (state.slots[i].on) {
+      ensureGrid(mode);
+      send(i, mode);
+    }
   }
 
   // Tên khung = tên nhân vật + cấp độ (đọc từ game). Chưa đọc được thì dùng thông tin lần trước, rồi mới đến tên mặc định.
@@ -206,7 +219,7 @@
     if (i < 0 || e.origin !== frameOrigin(i)) return;
     if (m.type === "hello") {
       const d = state.slots[i].desired;
-      if (d) send(i, d, true);
+      if (d) { ensureGrid(d); send(i, d, true); }
       if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
     } else if (m.type === "status") {
       const prev = live[i] || {};
