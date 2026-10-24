@@ -126,6 +126,11 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Bán đồ xanh** (thủ công + tự bán khi hành trang đầy), tùy chọn gồm cả đồ game đang giữ.
 - **Đóng bình** Phúc Duyên (🎐), **Dùng bình** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
   và **Mở hết** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.
+- **Bắt thú** (🐾): đi tìm những loài thú chưa có trong Thú điển. Thú rơi ngẫu nhiên khi hạ quái là thú ngoài bãi luyện công
+  (thường 0,1% · tinh anh 1% · trùm 8%), nên script đọc Thú điển, tra loài thiếu nằm ở bãi nào (`window.JX_FEED.pets` của game),
+  chuyển tới bãi đã mở có nhiều loài thiếu nhất rồi luyện công ở đó; có loài mới thì tính lại bãi. Tự dừng khi đủ Thú điển hoặc khi
+  các loài còn thiếu đều ở bãi chưa mở; bấm 🐾 lần nữa hoặc chọn chế độ khác để dừng. Chọn bãi làm game tắt "Tự đổi theo cấp".
+  Tải lại khung thì phải bấm lại.
 - Bố cục 2×2 hoặc 4 cột, phóng to / tắt từng khung. **Dùng bố cục 2×2 khi chạy Nhiệm Vụ**: ở 4 cột game không vẽ khung
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ. Vì vậy khi chọn Nhiệm Vụ, Phó Bản hoặc Chạy tất cả mà đang ở bố cục 1 hàng, trang tự chuyển về lưới.
 

@@ -133,6 +133,7 @@
   const sendSell = (i) => post(i, { type: "sell", kept: !!state.sellKept });
   const sendAutoSell = (i) => post(i, { type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept });
   const sendBoss = (i) => post(i, { type: "boss" });
+  const sendPet = (i) => post(i, { type: "pet" });
 
   // Nhiệm Vụ / Phó Bản (kể cả Chạy tất cả) cần khung đủ rộng để game vẽ khung "Theo Dấu": bố cục 1 hàng làm khung
   // quá hẹp nên tự chuyển về lưới. Chỉ đổi từ 1 hàng sang lưới, không đụng tới khung đang phóng to.
@@ -188,7 +189,7 @@
     const modeTxt = "Đang: " + modeName(l.mode) + (l.next ? " → " + modeName(l.next) : "");
     c.st.innerHTML = "Đang: <b>" + esc(modeName(l.mode)) + "</b>" + (l.next ? " → " + esc(modeName(l.next)) : "") +
       (l.lastMsg ? " · " + esc(l.lastMsg) : "");
-    c.st.title = [modeTxt, l.note, l.boss, l.pd, l.sell, l.autoInfo].filter(Boolean).join("\n");
+    c.st.title = [modeTxt, l.note, l.boss, l.pet, l.pd, l.sell, l.autoInfo].filter(Boolean).join("\n");
   }
 
   function mount(i, on) {
@@ -227,10 +228,10 @@
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "" };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "" };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
-      for (const k of ["note", "boss", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
+      for (const k of ["note", "boss", "pet", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
       live[i] = nl;
       // Bạn tự đổi chế độ ngay trong khung, hoặc tháp bị chặn -> đồng bộ lại lựa chọn
       if (m.sync && m.desired !== state.slots[i].desired) {
@@ -257,6 +258,7 @@
       MODES.map((m) => '<button class="sm" data-m="' + m[0] + '" title="' + m[2] + '" aria-label="' + m[2] + '">' + m[1] + '</button>').join("") +
       '<button class="sm" data-m="combo" title="Chạy tất cả: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công" aria-label="Chạy tất cả">▶</button>' +
       '<button class="sm" data-boss title="Boss tuần: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng)" aria-label="Boss tuần">👹</button>' +
+      '<button class="sm" data-pet title="Bắt thú: đi tìm những loài thú chưa có trong Thú điển (đứng ở bãi có loài còn thiếu và luyện công; bấm lần nữa để dừng)" aria-label="Bắt thú">🐾</button>' +
       '<button class="sm" data-sell title="Bán đồ xanh trong hành trang (đồ khóa, đồ đang mặc, đồ bạn đặt giữ được giữ lại)" aria-label="Bán đồ xanh">💰</button>' +
       '<button class="sm" data-pdd title="Đóng bình: đóng hết Phúc Duyên chờ đóng thành bình Đại / Trung / Tiểu" aria-label="Đóng bình">🎐</button>' +
       '<button class="sm" data-pdu title="Dùng bình: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
@@ -271,6 +273,7 @@
     const idx = () => els.indexOf(c);
     c.mbtns.forEach((b) => (b.onclick = () => setDesired(idx(), b.dataset.m)));
     slot.querySelector("[data-boss]").onclick = () => sendBoss(idx());
+    slot.querySelector("[data-pet]").onclick = () => sendPet(idx());
     slot.querySelector("[data-sell]").onclick = () => sendSell(idx());
     slot.querySelector("[data-pdd]").onclick = () => sendPd(idx(), "dong");
     slot.querySelector("[data-pdu]").onclick = () => sendPd(idx(), "dung");
@@ -352,6 +355,11 @@
   bossBtn.title = "Tất cả nhân vật: tự khiêu chiến Boss tuần cho đến hết lượt (bấm lần nữa để dừng)";
   bossBtn.onclick = () => forOn(sendBoss);
   allBox.appendChild(bossBtn);
+  const petBtn = document.createElement("button");
+  petBtn.textContent = "🐾 Bắt thú";
+  petBtn.title = "Tất cả nhân vật: đi tìm những loài thú chưa có trong Thú điển (bấm lần nữa để dừng)";
+  petBtn.onclick = () => forOn(sendPet);
+  allBox.appendChild(petBtn);
   const sellBtn = document.createElement("button");
   sellBtn.textContent = "💰 Bán xanh";
   sellBtn.title = "Tất cả nhân vật: bán đồ xanh trong hành trang ngay bây giờ";
