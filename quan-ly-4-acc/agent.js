@@ -484,8 +484,8 @@
   // --- Nhật ký: chuyển các dòng đáng chú ý của khung thông báo game về trang quản lý ---
   // Game chỉ vẽ dòng nhật ký hệ thống vào #u20lines khi khung thông báo đang ở tab "Hệ thống" (mặc định là "Thế giới"),
   // nên lần đầu sau khi tải khung script bấm sang tab đó một lần (bạn đổi lại thì thôi, không ép nữa). Mỗi giây so danh sách
-  // dòng hiện có với lần trước để tìm dòng mới, chỉ gửi những dòng khớp LOG_NOTABLE (đồ Hoàng Kim / đồ phổ, dị thú, loài thú mới...).
-  const LOG_NOTABLE = /Hoàng Kim|Bạch Kim|Đồ phổ|đồ phổ|Dị thú|loài mới|Thu phục|Thần Mã|TRÚNG LỚN/;
+  // dòng hiện có với lần trước để tìm dòng mới, chỉ gửi những dòng khớp LOG_NOTABLE (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã).
+  const LOG_NOTABLE = /Hoàng Kim|Bạch Kim|Đồ phổ|đồ phổ|Thần Mã/;
   let logPrev = null; // các dòng ở lần quét trước (null = chưa quét lần nào: bỏ qua lịch sử có sẵn)
   let logSwitched = false;
   const lineDiff = (prev, cur) => {

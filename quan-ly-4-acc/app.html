@@ -535,7 +535,7 @@
   //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Game chỉ hiện số rút gọn
   //    ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
   //  - tầng tháp leo được trong ngày: cộng phần tầng tăng so với tầng thấy lần trước, ra khỏi tháp vào lại thì đếm tiếp (đọc từ tên bãi trên thanh trên của game)
-  //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / đồ phổ, dị thú, loài thú mới...)
+  //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã)
   // Ngày tính theo giờ Việt Nam (GMT+7) như game.
   const LOGKEY = "quanly4acc.log.v1";
   const LOG_DAYS = 14;
@@ -717,7 +717,7 @@
     chars.forEach((n) => logData[n].events.forEach((e) => evs.push({ n, t: e.t, text: e.text })));
     evs.sort((a, b) => b.t - a.t);
     const ul = el("ul", "", "", box);
-    if (!evs.length) el("li", "dim", "Chưa có. Ghi các dòng nhật ký có Hoàng Kim, Bạch Kim, Đồ phổ, Dị thú, loài thú mới... (cần khung thông báo của game ở tab Hệ thống, script tự chuyển sang tab này một lần khi tải khung).", ul);
+    if (!evs.length) el("li", "dim", "Chưa có. Ghi các dòng nhật ký có Hoàng Kim, Bạch Kim, Đồ phổ, Thần Mã (cần khung thông báo của game ở tab Hệ thống, script tự chuyển sang tab này một lần khi tải khung).", ul);
     evs.slice(0, 100).forEach((e) => {
       const li = el("li", "", "", ul);
       el("time", "", e.t >= Date.parse(today + "T00:00:00+07:00") ? vnTime(e.t) : vnDay(e.t).slice(5) + " " + vnTime(e.t), li);
