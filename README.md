@@ -132,6 +132,11 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   chuyển tới bãi đã mở có nhiều loài thiếu nhất rồi luyện công ở đó; có loài mới thì tính lại bãi. Tự dừng khi đủ Thú điển hoặc khi
   các loài còn thiếu đều ở bãi chưa mở; bấm 🐾 lần nữa hoặc chọn chế độ khác để dừng. Chọn bãi làm game tắt "Tự đổi theo cấp".
   Tải lại khung thì phải bấm lại.
+- **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, số tầng tháp leo được, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
+  số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã; đổi mẫu nhận diện ở
+  `LOG_NOTABLE` trong `agent.js`); có sự kiện mới thì hiện thông báo nhỏ ở góc dưới phải. Số liệu lưu trong `localStorage` của trình duyệt.
+  Ngân lượng / KNB lấy từ số rút gọn trên thanh trên của game nên có sai số nhỏ ở số lớn; "kiếm" cộng các lần số tăng, "chi" cộng các lần giảm.
+  Dòng nhật ký chỉ có khi khung thông báo của game ở tab **Hệ thống**: lần đầu sau khi tải khung script tự bấm sang tab đó một lần.
 - Bố cục 2×2 hoặc 4 cột, phóng to / tắt từng khung. **Dùng bố cục 2×2 khi chạy Nhiệm Vụ**: ở 4 cột game không vẽ khung
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ. Vì vậy khi chọn Nhiệm Vụ, Phó Bản hoặc Chạy tất cả mà đang ở bố cục 1 hàng, trang tự chuyển về lưới.
 

@@ -43,6 +43,23 @@
   #upd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:3px 10px; background:#2b2a14; border-bottom:1px solid var(--accent); color:var(--accent); font-size:12px; }
   #upd[hidden] { display:none; }
   #upd .why { color:var(--dim); flex:1 1 200px; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #logPanel { position:fixed; inset:0; z-index:50; background:rgba(0,0,0,.6); display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; overflow:auto; }
+  #logPanel[hidden] { display:none; }
+  #logBox { width:min(900px,100%); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px 14px; }
+  #logBox h2 { margin:0 0 8px; font-size:15px; color:var(--accent); display:flex; align-items:center; gap:8px; }
+  #logBox h2 .grow { flex:1; }
+  #logBox h3 { margin:12px 0 4px; font-size:13px; color:var(--accent); font-weight:600; }
+  #logBox table { width:100%; border-collapse:collapse; font-size:12px; }
+  #logBox th, #logBox td { text-align:right; padding:2px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  #logBox th:first-child, #logBox td:first-child { text-align:left; }
+  #logBox th { color:var(--dim); font-weight:400; }
+  #logBox .pos { color:var(--ok); } #logBox .neg { color:#e27a6a; } #logBox .dim { color:var(--dim); }
+  #logBox ul { list-style:none; margin:0; padding:0; max-height:42vh; overflow:auto; font-size:12px; }
+  #logBox li { padding:2px 0; border-bottom:1px solid var(--line); } #logBox li time { color:var(--dim); margin-right:6px; }
+  #logBox .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; }
+  #logToast { position:fixed; right:12px; bottom:12px; z-index:60; display:flex; flex-direction:column; gap:6px; max-width:min(420px,90vw); }
+  #logToast div { background:#2b2a14; border:1px solid var(--accent); color:var(--text); border-radius:6px; padding:6px 10px; font-size:12px; box-shadow:0 2px 10px rgba(0,0,0,.5); }
+  #logToast b { color:var(--accent); }
   footer { padding:3px 10px; color:var(--dim); font-size:12px; border-top:1px solid var(--line); }
   @media (max-width: 900px) {
     main { grid-template-columns:1fr !important; grid-template-rows:none !important; overflow-y:auto; }
@@ -61,6 +78,7 @@
   <span class="sep"></span>
   <div class="grp" id="allModes"><span>Tất cả:</span></div>
   <span class="grow"></span>
+  <button id="logBtn" title="Nhật ký hoạt động của từng nhân vật: cấp tăng, ngân lượng kiếm được trong ngày, đồ đáng chú ý">📒 Nhật ký <small id="logBadge"></small></button>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </header>
 <div id="upd" hidden>
@@ -69,6 +87,8 @@
   <button id="updGo" class="sm" title="Tải bản mới từ GitHub (git pull) rồi tải lại trang">Cập nhật</button>
   <button id="updLater" class="sm" title="Ẩn thông báo cho đến khi có bản mới hơn">Để sau</button>
 </div>
+<div id="logPanel" hidden><div id="logBox"></div></div>
+<div id="logToast"></div>
 <main id="main"></main>
 <footer id="foot"></footer>
 
@@ -222,17 +242,20 @@
       const d = state.slots[i].desired;
       if (d) { ensureGrid(d); send(i, d, true); }
       if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
+    } else if (m.type === "events") {
+      logEvents(i, m.lines);
     } else if (m.type === "status") {
       const prev = live[i] || {};
       const s = state.slots[i];
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "" };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", tower: m.tower | 0 };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pet", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
       live[i] = nl;
+      logSample(i, nl);
       // Bạn tự đổi chế độ ngay trong khung, hoặc tháp bị chặn -> đồng bộ lại lựa chọn
       if (m.sync && m.desired !== state.slots[i].desired) {
         state.slots[i].desired = m.desired;
@@ -505,6 +528,222 @@
     setTimeout(poll, 8000); // máy chủ kiểm tra lần đầu sau ~5 giây
     setInterval(poll, 5 * 60 * 1000);
   })();
+
+  // --- Nhật ký hoạt động ---
+  // Số liệu theo nhân vật (khóa = tên nhân vật), lưu trong localStorage của trình duyệt này, giữ 14 ngày gần nhất:
+  //  - cấp tăng trong ngày: cộng các lần cấp tăng (đọc từ thanh trên của game)
+  //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Game chỉ hiện số rút gọn
+  //    ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
+  //  - tầng tháp leo được trong ngày: cộng phần tầng tăng so với tầng thấy lần trước, ra khỏi tháp vào lại thì đếm tiếp (đọc từ tên bãi trên thanh trên của game)
+  //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã)
+  // Ngày tính theo giờ Việt Nam (GMT+7) như game.
+  const LOGKEY = "quanly4acc.log.v1";
+  const LOG_DAYS = 14;
+  const LOG_EVENTS_MAX = 300;
+  const LOG_GAP_MS = 6 * 3600e3;
+  let logData = {};
+  try { logData = JSON.parse(localStorage.getItem(LOGKEY) || "{}") || {}; } catch (e) { logData = {}; }
+  let logDirty = false;
+  let logUnread = 0;
+  setInterval(() => {
+    if (!logDirty) return;
+    logDirty = false;
+    try { localStorage.setItem(LOGKEY, JSON.stringify(logData)); } catch (e) {}
+  }, 5000);
+  window.addEventListener("pagehide", () => { try { localStorage.setItem(LOGKEY, JSON.stringify(logData)); } catch (e) {} });
+
+  const vnDay = (t) => new Date((t || Date.now()) + 7 * 3600e3).toISOString().slice(0, 10);
+  const vnTime = (t) => new Date(t + 7 * 3600e3).toISOString().slice(11, 16);
+  const parseGold = (t) => { // G() của game: "9.876" | "12,3 vạn" | "1.234 vạn"
+    t = String(t || "").trim();
+    if (!t) return null;
+    const n = parseFloat(t.replace(/[^\d,.]/g, "").replace(/\./g, "").replace(",", "."));
+    return isFinite(n) ? Math.round(/vạn/.test(t) ? n * 1e4 : n) : null;
+  };
+  const parseKnb = (t) => { // E() của game: "1234" | "12.3k" | "1.23M"
+    const m = String(t || "").trim().match(/^([\d.]+)\s*([kMB]?)$/);
+    return m ? Math.round(parseFloat(m[1]) * ({ k: 1e3, M: 1e6, B: 1e9 }[m[2]] || 1)) : null;
+  };
+  const logKey = (i) => (live[i] && live[i].hero) || state.slots[i].hero || ("Khung " + (i + 1));
+  const logChar = (key) => logData[key] || (logData[key] = { days: {}, events: [] });
+  const logDay = (c, day) => c.days[day] || (c.days[day] = { lv0: 0, up: 0, earned: 0, spent: 0, knbIn: 0, knbOut: 0, tw: 0, twMax: 0 });
+  const logTrim = (c) => {
+    const keep = Object.keys(c.days).sort().slice(-LOG_DAYS);
+    Object.keys(c.days).forEach((d) => { if (!keep.includes(d)) delete c.days[d]; });
+    if (c.events.length > LOG_EVENTS_MAX) c.events.length = LOG_EVENTS_MAX;
+  };
+
+  function logSample(i, l) {
+    if (!l.ready) return;
+    const lvl = l.lvl | 0, gold = parseGold(l.gold), knb = parseKnb(l.knb);
+    const tw = l.tower | 0;
+    if (!(lvl > 0) || gold == null || knb == null) return;
+    const c = logChar(logKey(i));
+    const d = logDay(c, vnDay());
+    const last = c.last;
+    if (!d.lv0) d.lv0 = lvl;
+    if (last && Date.now() - last.t < LOG_GAP_MS) { // đóng trang quá lâu thì chỉ đặt lại mốc, không tính chênh lệch
+      if (lvl > last.lvl) d.up += lvl - last.lvl;
+      const dg = gold - last.gold;
+      if (dg > 0) d.earned += dg; else if (dg < 0) d.spent -= dg;
+      const dk = knb - last.knb;
+      if (dk > 0) d.knbIn += dk; else if (dk < 0) d.knbOut -= dk;
+      // Tầng tháp: cộng phần tầng tăng so với tầng thấy lần trước (c.twPos). Ra khỏi tháp thì giữ nguyên mốc, vào lại
+      // (game vào lại đúng tầng đã rời) thì đếm tiếp từ đó. Sang ngày mới số đếm về 0 nhưng mốc vẫn giữ.
+      if (tw > 0 && (c.twPos | 0) > 0 && tw > c.twPos) d.tw = (d.tw | 0) + tw - c.twPos;
+    }
+    if (tw > 0) {
+      d.twMax = Math.max(d.twMax | 0, tw);
+      c.twPos = tw;
+    }
+    c.last = { lvl, gold, knb, t: Date.now() };
+    c.lv = lvl;
+    logTrim(c);
+    logDirty = true;
+  }
+
+  function logEvents(i, lines) {
+    if (!Array.isArray(lines)) return;
+    const key = logKey(i);
+    const c = logChar(key);
+    const now = Date.now();
+    lines.slice(0, 20).forEach((t) => {
+      t = String(t).slice(0, 200);
+      const top = c.events[0];
+      if (top && top.text === t && now - top.t < 3000) return; // cùng một dòng đọc hai lần
+      c.events.unshift({ t: now, text: t });
+      logUnread++;
+      logToast(key, t);
+    });
+    logTrim(c);
+    logDirty = true;
+    badge();
+    if (!document.getElementById("logPanel").hidden) renderLog();
+  }
+
+  function logToast(key, text) {
+    const box = document.getElementById("logToast");
+    const d = document.createElement("div");
+    const b = document.createElement("b");
+    b.textContent = key + ": ";
+    d.appendChild(b);
+    d.appendChild(document.createTextNode(text));
+    box.appendChild(d);
+    while (box.children.length > 4) box.removeChild(box.firstChild);
+    setTimeout(() => d.remove(), 10000);
+  }
+  const badge = () => { document.getElementById("logBadge").textContent = logUnread ? "(" + logUnread + ")" : ""; };
+
+  const fmtNum = (n) => Math.round(n).toLocaleString("vi-VN");
+  const fmtGold = (n) => (Math.abs(n) >= 1e4 ? fmtNum(n / 1e4) + " vạn" : fmtNum(n));
+  let logSel = ""; // nhân vật đang xem ("" = tất cả)
+
+  function renderLog() {
+    const panel = document.getElementById("logPanel");
+    const box = document.getElementById("logBox");
+    const keepPanel = panel.scrollTop;
+    const oldUl = box.querySelector("ul");
+    const keepUl = oldUl ? oldUl.scrollTop : 0;
+    box.textContent = "";
+    requestAnimationFrame(() => { panel.scrollTop = keepPanel; const u = box.querySelector("ul"); if (u) u.scrollTop = keepUl; });
+    const el = (tag, cls, text, parent) => {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      if (parent) parent.appendChild(e);
+      return e;
+    };
+    const head = el("h2", "", "📒 Nhật ký hoạt động", box);
+    el("span", "grow", "", head);
+    const x = el("button", "sm", "✕ Đóng", head);
+    x.onclick = () => { document.getElementById("logPanel").hidden = true; };
+
+    const names = Object.keys(logData).sort();
+    if (!names.length) {
+      el("p", "dim", "Chưa có số liệu. Mở các khung game và đăng nhập, số liệu sẽ được ghi từ lúc đó.", box);
+      return;
+    }
+    if (logSel && !names.includes(logSel)) logSel = "";
+    const tabs = el("div", "tabs", "", box);
+    ["", ...names].forEach((n) => {
+      const b = el("button", "sm" + (n === logSel ? " on" : ""), n || "Tất cả", tabs);
+      b.onclick = () => { logSel = n; renderLog(); };
+    });
+    const today = vnDay();
+    const chars = logSel ? [logSel] : names;
+
+    el("h3", "", "Hôm nay (" + today + ")", box);
+    const t1 = el("table", "", "", box);
+    const r0 = el("tr", "", "", t1);
+    ["Nhân vật", "Cấp", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "KNB chi", "Tầng tháp", "Tầng cao nhất"].forEach((h) => el("th", "", h, r0));
+    chars.forEach((n) => {
+      const c = logData[n], d = c.days[today];
+      const r = el("tr", "", "", t1);
+      el("td", "", n, r);
+      el("td", "", c.lv || "-", r);
+      if (!d) { for (let k = 0; k < 8; k++) el("td", "dim", "-", r); return; }
+      el("td", d.up ? "pos" : "dim", d.up ? "+" + d.up : "0", r);
+      el("td", d.earned ? "pos" : "dim", fmtGold(d.earned), r);
+      el("td", d.spent ? "neg" : "dim", fmtGold(d.spent), r);
+      const net = d.earned - d.spent;
+      el("td", net >= 0 ? "pos" : "neg", (net > 0 ? "+" : "") + fmtGold(net), r);
+      el("td", d.knbIn ? "pos" : "dim", fmtNum(d.knbIn), r);
+      el("td", d.knbOut ? "neg" : "dim", fmtNum(d.knbOut), r);
+      el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
+      el("td", d.twMax ? "" : "dim", d.twMax ? String(d.twMax) : "-", r);
+    });
+
+    if (logSel) {
+      const c = logData[logSel];
+      el("h3", "", "Các ngày gần đây", box);
+      const t2 = el("table", "", "", box);
+      const h2 = el("tr", "", "", t2);
+      ["Ngày", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "Tầng tháp"].forEach((h) => el("th", "", h, h2));
+      Object.keys(c.days).sort().reverse().forEach((day) => {
+        const d = c.days[day], r = el("tr", "", "", t2);
+        el("td", "", day, r);
+        el("td", d.up ? "pos" : "dim", d.up ? "+" + d.up : "0", r);
+        el("td", "", fmtGold(d.earned), r);
+        el("td", "", fmtGold(d.spent), r);
+        const net = d.earned - d.spent;
+        el("td", net >= 0 ? "pos" : "neg", (net > 0 ? "+" : "") + fmtGold(net), r);
+        el("td", "", fmtNum(d.knbIn), r);
+        el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
+      });
+    }
+
+    el("h3", "", "Sự kiện đáng chú ý" + (logSel ? "" : " (tất cả nhân vật)"), box);
+    const evs = [];
+    chars.forEach((n) => logData[n].events.forEach((e) => evs.push({ n, t: e.t, text: e.text })));
+    evs.sort((a, b) => b.t - a.t);
+    const ul = el("ul", "", "", box);
+    if (!evs.length) el("li", "dim", "Chưa có. Ghi các dòng nhật ký có Hoàng Kim, Bạch Kim, Đồ phổ, Thần Mã (cần khung thông báo của game ở tab Hệ thống, script tự chuyển sang tab này một lần khi tải khung).", ul);
+    evs.slice(0, 100).forEach((e) => {
+      const li = el("li", "", "", ul);
+      el("time", "", e.t >= Date.parse(today + "T00:00:00+07:00") ? vnTime(e.t) : vnDay(e.t).slice(5) + " " + vnTime(e.t), li);
+      if (!logSel) el("b", "", e.n + ": ", li);
+      li.appendChild(document.createTextNode(e.text));
+    });
+
+    const clr = el("button", "sm", logSel ? "Xóa nhật ký của " + logSel : "Xóa toàn bộ nhật ký", box);
+    clr.style.marginTop = "10px";
+    clr.onclick = () => {
+      if (!confirm(logSel ? "Xóa nhật ký của " + logSel + "?" : "Xóa nhật ký của tất cả nhân vật?")) return;
+      if (logSel) delete logData[logSel]; else logData = {};
+      logSel = "";
+      logDirty = true;
+      renderLog();
+    };
+  }
+  document.getElementById("logBtn").onclick = () => {
+    logUnread = 0;
+    badge();
+    const p = document.getElementById("logPanel");
+    p.hidden = !p.hidden;
+    if (!p.hidden) renderLog();
+  };
+  document.getElementById("logPanel").onclick = (e) => { if (e.target.id === "logPanel") e.target.hidden = true; };
+  setInterval(() => { if (!document.getElementById("logPanel").hidden) renderLog(); }, 5000);
 
   document.getElementById("reloadAll").onclick = () => state.slots.forEach((s, i) => s.on && mount(i, true));
   afterCountChange();

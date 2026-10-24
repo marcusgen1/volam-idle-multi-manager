@@ -129,7 +129,7 @@
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
     const ready = !!q("#mswMenu");
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", tower: ready ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -479,6 +479,45 @@
       pdRun = false;
       report(true);
     }
+  }
+
+  // --- Nhật ký: chuyển các dòng đáng chú ý của khung thông báo game về trang quản lý ---
+  // Game chỉ vẽ dòng nhật ký hệ thống vào #u20lines khi khung thông báo đang ở tab "Hệ thống" (mặc định là "Thế giới"),
+  // nên lần đầu sau khi tải khung script bấm sang tab đó một lần (bạn đổi lại thì thôi, không ép nữa). Mỗi giây so danh sách
+  // dòng hiện có với lần trước để tìm dòng mới, chỉ gửi những dòng khớp LOG_NOTABLE (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã).
+  const LOG_NOTABLE = /Hoàng Kim|Bạch Kim|Đồ phổ|đồ phổ|Thần Mã/;
+  let logPrev = null; // các dòng ở lần quét trước (null = chưa quét lần nào: bỏ qua lịch sử có sẵn)
+  let logSwitched = false;
+  const lineDiff = (prev, cur) => {
+    // Danh sách trượt: dòng mới thêm vào cuối, dòng cũ rơi khỏi đầu. Tìm phần cuối của prev trùng với phần đầu của cur.
+    for (let keep = Math.min(prev.length, cur.length); keep >= 0; keep--) {
+      let ok = true;
+      for (let k = 0; k < keep && ok; k++) if (cur[k] !== prev[prev.length - keep + k]) ok = false;
+      if (ok) return cur.slice(keep);
+    }
+    return cur;
+  };
+  function logScan() {
+    const box = q("#u20lines");
+    if (!box || !q("#mswMenu")) {
+      logPrev = null;
+      return;
+    }
+    const ch = box.dataset.lt;
+    if (ch !== "sys" && ch !== "all") {
+      logPrev = null;
+      const b = !logSwitched && q('#u20ct button[data-lt="sys"]');
+      if (b) {
+        logSwitched = true;
+        b.click();
+      }
+      return;
+    }
+    const cur = Array.prototype.map.call(box.children, (el) => el.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+    const fresh = logPrev ? lineDiff(logPrev, cur) : [];
+    logPrev = cur;
+    const out = fresh.filter((t) => LOG_NOTABLE.test(t) && !(/^Hạ /.test(t) && !/Đồ phổ|đồ phổ/.test(t)));
+    if (out.length) post({ type: "events", lines: out.slice(0, 20) });
   }
 
   // --- Bắt thú: đi tìm những loài thú chưa có trong Thú điển ---
@@ -944,6 +983,12 @@
   let heroAt = 0;
   let heroTries = 0;
   // Ngân lượng / Kim Nguyên Bảo: đọc đúng chữ game đang hiển thị ở thanh trên (đã rút gọn sẵn, ví dụ "1,2tr")
+  // Tầng tháp đang leo: tên bãi ở thanh trên hiện "Thông Thiên Tháp · tầng 37" khi ở trong tháp (0 = không ở trong tháp)
+  const readTower = () => {
+    const el = q("#u20zn");
+    const m = el && el.textContent.match(/Tháp\s*·\s*tầng\s*(\d+)/);
+    return m ? +m[1] : 0;
+  };
   const readText = (sel) => {
     const el = q(sel);
     return el ? el.textContent.trim() : "";
@@ -1119,5 +1164,6 @@
   setInterval(() => {
     autoSellTick().catch(() => {});
   }, AUTO_SELL_POLL_MS);
+  setInterval(logScan, 1000);
   post({ type: "hello" });
 })();
