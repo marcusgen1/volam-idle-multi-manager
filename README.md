@@ -124,7 +124,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Nhiệm Vụ / Phó Bản tự về Luyện Công khi hết việc; Leo Tháp tự vào lại khi gục ngã và dừng sau 3 lần chết liên tiếp.
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
 - **Bán đồ xanh** (thủ công + tự bán khi hành trang đầy), tùy chọn gồm cả đồ game đang giữ.
-- **Đóng bình** Phúc Duyên (🎐), **Dùng hết bình** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
+- **Đóng bình** Phúc Duyên (🎐), **Dùng bình** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
   và **Mở hết** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.
 - Bố cục 2×2 hoặc 4 cột, phóng to / tắt từng khung. **Dùng bố cục 2×2 khi chạy Nhiệm Vụ**: ở 4 cột game không vẽ khung
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ.
