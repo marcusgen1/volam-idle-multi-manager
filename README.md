@@ -125,7 +125,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
 - **Bán đồ xanh** (thủ công + tự bán khi hành trang đầy), tùy chọn gồm cả đồ game đang giữ.
 - **Đóng bình** Phúc Duyên (🎐), **Dùng bình** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
-  và **Mở hết** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.
+  và **Mở hết** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). **Mở hồng bao** (🧧): mở hết Hồng Bao và Đại Hồng Bao đang có
+  (lưu trên máy chủ, dùng chung cả tài khoản; mỗi lần bấm game mở tối đa 10 cái nên script bấm lặp tới khi hết). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.
 - **Bắt thú** (🐾): đi tìm những loài thú chưa có trong Thú điển. Thú rơi ngẫu nhiên khi hạ quái là thú ngoài bãi luyện công
   (thường 0,1% · tinh anh 1% · trùm 8%), nên script đọc Thú điển, tra loài thiếu nằm ở bãi nào (`window.JX_FEED.pets` của game),
   chuyển tới bãi đã mở có nhiều loài thiếu nhất rồi luyện công ở đó; có loài mới thì tính lại bãi. Tự dừng khi đủ Thú điển hoặc khi
