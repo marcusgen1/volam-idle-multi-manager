@@ -129,8 +129,10 @@
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
     const ready = !!q("#mswMenu");
-    const ok = ready && charLoaded(); // chưa vào nhân vật thì các số trên thanh trên còn là mặc định (cấp 1, 0 lượng), không báo
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ok ? readLevel() : 0, gold: ok ? readText("#gold") : "", knb: ok ? readText("#knbTop") : "", tower: ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const sv = ready ? readSave() : null; // số liệu thật từ bản lưu của game (không phụ thuộc việc khung có đang được vẽ)
+    const ok = ready && charLoaded(); // không có bản lưu thì đọc chữ trên thanh trên, nhưng chỉ khi đã vào nhân vật (trước đó là số mặc định: cấp 1, 0 lượng)
+    if (sv && sv.name) heroName = sv.name;
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -993,6 +995,49 @@
   const readText = (sel) => {
     const el = q(sel);
     return el ? el.textContent.trim() : "";
+  };
+  // Số liệu thật của nhân vật: đọc từ bản lưu của chính game trong localStorage của khung này (khóa "jxidle" hoặc "jxidle_N",
+  // dạng {f, d, h} với d là JSON trạng thái nhân vật) thay vì từ chữ trên thanh trên. Game chỉ vẽ lại thanh trên khi khung đang
+  // được nhìn thấy (tab nền thì đứng yên, khung nạp trong tab nền còn số mặc định cấp 1) còn bản lưu thì game ghi mỗi ~10 giây
+  // kể cả khi ẩn. Chỉ đọc, không ghi. Phân tích lại chỉ khi bản lưu đổi (so phần cuối chuỗi: có mã băm h).
+  const SAVE_READ_MS = 3000;
+  let saveInfo = null;
+  let saveSig = "";
+  let saveAt = 0;
+  const readSave = () => {
+    const now = Date.now();
+    if (now - saveAt < SAVE_READ_MS) return saveInfo;
+    saveAt = now;
+    try {
+      const slot = localStorage.getItem("jxidle_slot"); // số thứ tự ô nhân vật; "menu" = đang ở màn chọn nhân vật
+      if (!/^\d+$/.test(slot || "")) return (saveInfo = null);
+      const raw = localStorage.getItem(+slot === 0 ? "jxidle" : "jxidle_" + (+slot + 1));
+      if (!raw) return (saveInfo = null);
+      const sig = slot + ":" + raw.length + ":" + raw.slice(-96);
+      if (sig === saveSig) return saveInfo;
+      saveSig = sig;
+      const st = JSON.parse(JSON.parse(raw).d);
+      const num = (v) => (isFinite(+v) ? Math.round(+v) : 0);
+      saveInfo =
+        st && st.fac != null && num(st.lvl) > 0
+          ? { name: String(st.name || "").trim(), lvl: num(st.lvl), gold: num(st.gold), knb: num(st.knb), tw: num(st.rw && st.rw.twF) }
+          : null;
+    } catch (e) {
+      saveInfo = null;
+    }
+    return saveInfo;
+  };
+  // Định dạng số giống thanh trên của game (hàm G / E): "9.876", "12,3 vạn", "1.234 vạn" / "1234", "12.3k", "1.23M"
+  const fmtGold = (n) => {
+    n = Math.round(n);
+    if (Math.abs(n) < 1e4) return n.toLocaleString("vi-VN");
+    const t = n / 1e4;
+    return (Math.abs(t) < 100 ? (Math.round(t * 10) / 10).toLocaleString("vi-VN") : Math.round(t).toLocaleString("vi-VN")) + " vạn";
+  };
+  const fmtKnb = (n) => {
+    n = Math.round(n);
+    const a = Math.abs(n);
+    return a < 1e4 ? "" + n : a < 1e6 ? (n / 1e3).toFixed(a < 1e5 ? 1 : 0) + "k" : a < 1e9 ? (n / 1e6).toFixed(2) + "M" : (n / 1e9).toFixed(2) + "B";
   };
   // Đã vào nhân vật chưa: nút chế độ của game ẩn cho tới khi nhân vật được nạp (khi đó thanh trên mới có số thật)
   const charLoaded = () => {
