@@ -533,11 +533,13 @@
   // Số liệu theo nhân vật (khóa = tên nhân vật), lưu trong localStorage của trình duyệt này, giữ 14 ngày gần nhất:
   //  - cấp tăng trong ngày: cộng các lần cấp tăng (đọc từ thanh trên của game)
   //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Số đọc từ bản lưu của game
-  //    (chính xác); không đọc được thì dùng chữ rút gọn trên thanh trên ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
+  //    (chính xác); không có bản lưu thì không ghi.
   //  - tầng tháp leo được trong ngày: cộng phần tầng tăng so với tầng thấy lần trước, ra khỏi tháp vào lại thì đếm tiếp (đọc từ tên bãi trên thanh trên của game)
   //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã)
   // Ngày tính theo giờ Việt Nam (GMT+7) như game.
-  const LOGKEY = "quanly4acc.log.v1";
+  // v2: bản v1 có số liệu sai (mốc cấp 1 / 0 lượng lúc khung chưa nạp nhân vật, về sau bị tính thành "kiếm được" cả số đang có) nên bỏ hẳn
+  const LOGKEY = "quanly4acc.log.v2";
+  try { localStorage.removeItem("quanly4acc.log.v1"); } catch (e) {}
   const LOG_DAYS = 14;
   const LOG_EVENTS_MAX = 300;
   const LOG_GAP_MS = 6 * 3600e3;
@@ -554,16 +556,6 @@
 
   const vnDay = (t) => new Date((t || Date.now()) + 7 * 3600e3).toISOString().slice(0, 10);
   const vnTime = (t) => new Date(t + 7 * 3600e3).toISOString().slice(11, 16);
-  const parseGold = (t) => { // G() của game: "9.876" | "12,3 vạn" | "1.234 vạn"
-    t = String(t || "").trim();
-    if (!t) return null;
-    const n = parseFloat(t.replace(/[^\d,.]/g, "").replace(/\./g, "").replace(",", "."));
-    return isFinite(n) ? Math.round(/vạn/.test(t) ? n * 1e4 : n) : null;
-  };
-  const parseKnb = (t) => { // E() của game: "1234" | "12.3k" | "1.23M"
-    const m = String(t || "").trim().match(/^([\d.]+)\s*([kMB]?)$/);
-    return m ? Math.round(parseFloat(m[1]) * ({ k: 1e3, M: 1e6, B: 1e9 }[m[2]] || 1)) : null;
-  };
   const logKey = (i) => (live[i] && live[i].hero) || state.slots[i].hero || ("Khung " + (i + 1));
   const logChar = (key) => logData[key] || (logData[key] = { days: {}, events: [] });
   const logDay = (c, day) => c.days[day] || (c.days[day] = { lv0: 0, up: 0, earned: 0, spent: 0, knbIn: 0, knbOut: 0, tw: 0, twMax: 0 });
@@ -575,7 +567,10 @@
 
   function logSample(i, l) {
     if (!l.ready || !l.hero) return; // chưa đọc được tên nhân vật thì chưa biết ghi cho ai: bỏ qua, không ghi vào "Khung N"
-    const lvl = l.lvl | 0, gold = typeof l.goldN === "number" ? l.goldN : parseGold(l.gold), knb = typeof l.knbN === "number" ? l.knbN : parseKnb(l.knb);
+    // Chỉ ghi khi có số liệu từ bản lưu của game. Chữ trên thanh trên còn số mặc định (cấp 1, 0 lượng) khi khung chưa được vẽ,
+    // dùng làm mốc sẽ khiến lần đọc thật sau đó bị tính thành "tăng" cả số đang có.
+    if (typeof l.goldN !== "number" || typeof l.knbN !== "number") return;
+    const lvl = l.lvl | 0, gold = l.goldN, knb = l.knbN;
     const tw = l.tower | 0;
     if (!(lvl > 0) || gold == null || knb == null) return;
     const c = logChar(l.hero);
