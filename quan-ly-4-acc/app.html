@@ -78,6 +78,7 @@
   <span class="sep"></span>
   <div class="grp" id="allModes"><span>Tất cả:</span></div>
   <span class="grow"></span>
+  <button id="updNow" title="Kiểm tra bản mới trên GitHub ngay (không cần chờ thông báo) và cập nhật nếu có">⬆ Cập nhật</button>
   <button id="logBtn" title="Nhật ký hoạt động của từng nhân vật: cấp tăng, ngân lượng kiếm được trong ngày, đồ đáng chú ý">📒 Nhật ký <small id="logBadge"></small></button>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </header>
@@ -524,6 +525,34 @@
       working = false;
       go.disabled = later.disabled = false;
       msg.textContent = "Cập nhật chưa thành công" + (err ? ": " + err : ".");
+    };
+    // Nút "Cập nhật" ở đầu trang: bắt máy chủ kiểm tra GitHub ngay; có bản mới thì hỏi và cập nhật luôn, không thì báo lý do / "đang dùng bản mới nhất"
+    const now = document.getElementById("updNow");
+    now.onclick = async () => {
+      if (working) return;
+      const label = now.textContent;
+      now.disabled = true;
+      now.textContent = "Đang kiểm tra…";
+      const say = (t) => logToast("Cập nhật", t);
+      try {
+        const r = await fetch("/__update/check", { method: "POST", headers: HDR });
+        const u = await r.json();
+        if (!u.supported) say("Không dùng được: máy chủ không thấy git hoặc thư mục này không phải bản clone từ GitHub.");
+        else if (u.error) say("Không kiểm tra được: " + u.error);
+        else if (!u.behind) say("Đang dùng bản mới nhất" + (u.head ? " (" + u.head + ")" : "") + ".");
+        else {
+          dismissed = "";
+          render(u);
+          now.disabled = false;
+          now.textContent = label;
+          go.onclick(); // hỏi xác nhận rồi cập nhật
+          return;
+        }
+      } catch (e) {
+        say("Không kết nối được máy chủ cục bộ.");
+      }
+      now.disabled = false;
+      now.textContent = label;
     };
     setTimeout(poll, 8000); // máy chủ kiểm tra lần đầu sau ~5 giây
     setInterval(poll, 5 * 60 * 1000);

@@ -93,7 +93,7 @@ function usableSlots() {
 // Không có git, hoặc thư mục không phải bản clone (tải zip) thì tính năng tự tắt, không ảnh hưởng gì khác.
 const REPO_DIR = path.join(__dirname, "..");
 const UPDATE_CHECK_MS = 3 * 60 * 60 * 1000; // 3 giờ kiểm tra một lần
-const update = { supported: false, behind: 0, commits: [], dirty: false, checkedAt: 0, error: "", busy: false, applied: false, output: "" };
+const update = { supported: false, head: "", behind: 0, commits: [], dirty: false, checkedAt: 0, error: "", busy: false, applied: false, output: "" };
 
 function git(args) {
   return new Promise((resolve, reject) => {
@@ -117,6 +117,7 @@ async function checkUpdate() {
     update.behind = parseInt(await git(["rev-list", "--count", "HEAD..@{u}"]), 10) || 0;
     update.commits = log ? log.split("\n") : [];
     update.dirty = (await git(["status", "--porcelain", "--untracked-files=no"])) !== "";
+    update.head = await git(["rev-parse", "--short", "HEAD"]); // bản đang chạy (để báo "đang dùng bản mới nhất")
     update.error = "";
   } catch (e) {
     update.error = e.message.split("\n")[0];
