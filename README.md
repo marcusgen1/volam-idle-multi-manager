@@ -132,7 +132,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   chuyển tới bãi đã mở có nhiều loài thiếu nhất rồi luyện công ở đó; có loài mới thì tính lại bãi. Tự dừng khi đủ Thú điển hoặc khi
   các loài còn thiếu đều ở bãi chưa mở; bấm 🐾 lần nữa hoặc chọn chế độ khác để dừng. Chọn bãi làm game tắt "Tự đổi theo cấp".
   Tải lại khung thì phải bấm lại.
-- **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
+- **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, số tầng tháp leo được, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
   số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ Hoàng Kim / Bạch Kim / đồ phổ, dị thú, loài thú mới…, đổi mẫu nhận diện ở
   `LOG_NOTABLE` trong `agent.js`); có sự kiện mới thì hiện thông báo nhỏ ở góc dưới phải. Số liệu lưu trong `localStorage` của trình duyệt.
   Ngân lượng / KNB lấy từ số rút gọn trên thanh trên của game nên có sai số nhỏ ở số lớn; "kiếm" cộng các lần số tăng, "chi" cộng các lần giảm.

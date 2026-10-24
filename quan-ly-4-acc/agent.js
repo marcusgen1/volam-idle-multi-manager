@@ -129,7 +129,7 @@
   // sync = true khi chính khung đổi lựa chọn (bạn tự bấm / bị chặn), để trang quản lý cập nhật theo
   function report(force, sync) {
     const ready = !!q("#mswMenu");
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: ready ? readLevel() : 0, gold: ready ? readText("#gold") : "", knb: ready ? readText("#knbTop") : "", tower: ready ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -983,6 +983,12 @@
   let heroAt = 0;
   let heroTries = 0;
   // Ngân lượng / Kim Nguyên Bảo: đọc đúng chữ game đang hiển thị ở thanh trên (đã rút gọn sẵn, ví dụ "1,2tr")
+  // Tầng tháp đang leo: tên bãi ở thanh trên hiện "Thông Thiên Tháp · tầng 37" khi ở trong tháp (0 = không ở trong tháp)
+  const readTower = () => {
+    const el = q("#u20zn");
+    const m = el && el.textContent.match(/Tháp\s*·\s*tầng\s*(\d+)/);
+    return m ? +m[1] : 0;
+  };
   const readText = (sel) => {
     const el = q(sel);
     return el ? el.textContent.trim() : "";

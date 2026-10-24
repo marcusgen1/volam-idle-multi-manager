@@ -250,7 +250,7 @@
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "" };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", tower: m.tower | 0 };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pet", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
@@ -534,6 +534,7 @@
   //  - cấp tăng trong ngày: cộng các lần cấp tăng (đọc từ thanh trên của game)
   //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Game chỉ hiện số rút gọn
   //    ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
+  //  - tầng tháp leo được trong ngày: cộng các lần tầng tăng khi đang ở trong tháp (đọc từ tên bãi trên thanh trên của game)
   //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / đồ phổ, dị thú, loài thú mới...)
   // Ngày tính theo giờ Việt Nam (GMT+7) như game.
   const LOGKEY = "quanly4acc.log.v1";
@@ -565,7 +566,7 @@
   };
   const logKey = (i) => (live[i] && live[i].hero) || state.slots[i].hero || ("Khung " + (i + 1));
   const logChar = (key) => logData[key] || (logData[key] = { days: {}, events: [] });
-  const logDay = (c, day) => c.days[day] || (c.days[day] = { lv0: 0, up: 0, earned: 0, spent: 0, knbIn: 0, knbOut: 0 });
+  const logDay = (c, day) => c.days[day] || (c.days[day] = { lv0: 0, up: 0, earned: 0, spent: 0, knbIn: 0, knbOut: 0, tw: 0, twMax: 0 });
   const logTrim = (c) => {
     const keep = Object.keys(c.days).sort().slice(-LOG_DAYS);
     Object.keys(c.days).forEach((d) => { if (!keep.includes(d)) delete c.days[d]; });
@@ -575,6 +576,7 @@
   function logSample(i, l) {
     if (!l.ready) return;
     const lvl = l.lvl | 0, gold = parseGold(l.gold), knb = parseKnb(l.knb);
+    const tw = l.tower | 0;
     if (!(lvl > 0) || gold == null || knb == null) return;
     const c = logChar(logKey(i));
     const d = logDay(c, vnDay());
@@ -586,7 +588,11 @@
       if (dg > 0) d.earned += dg; else if (dg < 0) d.spent -= dg;
       const dk = knb - last.knb;
       if (dk > 0) d.knbIn += dk; else if (dk < 0) d.knbOut -= dk;
+      // Tầng tháp: cộng mỗi lần tầng tăng khi vẫn đang ở trong tháp (vào lại tháp giữa chừng thì tính từ tầng lúc vào)
+      if (tw > 0 && (c.twNow | 0) > 0 && tw > c.twNow) d.tw = (d.tw | 0) + tw - c.twNow;
     }
+    if (tw > 0) d.twMax = Math.max(d.twMax | 0, tw);
+    c.twNow = tw;
     c.last = { lvl, gold, knb, t: Date.now() };
     c.lv = lvl;
     logTrim(c);
@@ -666,13 +672,13 @@
     el("h3", "", "Hôm nay (" + today + ")", box);
     const t1 = el("table", "", "", box);
     const r0 = el("tr", "", "", t1);
-    ["Nhân vật", "Cấp", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "KNB chi"].forEach((h) => el("th", "", h, r0));
+    ["Nhân vật", "Cấp", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "KNB chi", "Tầng tháp", "Tầng cao nhất"].forEach((h) => el("th", "", h, r0));
     chars.forEach((n) => {
       const c = logData[n], d = c.days[today];
       const r = el("tr", "", "", t1);
       el("td", "", n, r);
       el("td", "", c.lv || "-", r);
-      if (!d) { for (let k = 0; k < 6; k++) el("td", "dim", "-", r); return; }
+      if (!d) { for (let k = 0; k < 8; k++) el("td", "dim", "-", r); return; }
       el("td", d.up ? "pos" : "dim", d.up ? "+" + d.up : "0", r);
       el("td", d.earned ? "pos" : "dim", fmtGold(d.earned), r);
       el("td", d.spent ? "neg" : "dim", fmtGold(d.spent), r);
@@ -680,6 +686,8 @@
       el("td", net >= 0 ? "pos" : "neg", (net > 0 ? "+" : "") + fmtGold(net), r);
       el("td", d.knbIn ? "pos" : "dim", fmtNum(d.knbIn), r);
       el("td", d.knbOut ? "neg" : "dim", fmtNum(d.knbOut), r);
+      el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
+      el("td", d.twMax ? "" : "dim", d.twMax ? String(d.twMax) : "-", r);
     });
 
     if (logSel) {
@@ -687,7 +695,7 @@
       el("h3", "", "Các ngày gần đây", box);
       const t2 = el("table", "", "", box);
       const h2 = el("tr", "", "", t2);
-      ["Ngày", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm"].forEach((h) => el("th", "", h, h2));
+      ["Ngày", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "Tầng tháp"].forEach((h) => el("th", "", h, h2));
       Object.keys(c.days).sort().reverse().forEach((day) => {
         const d = c.days[day], r = el("tr", "", "", t2);
         el("td", "", day, r);
@@ -697,6 +705,7 @@
         const net = d.earned - d.spent;
         el("td", net >= 0 ? "pos" : "neg", (net > 0 ? "+" : "") + fmtGold(net), r);
         el("td", "", fmtNum(d.knbIn), r);
+        el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
       });
     }
 
