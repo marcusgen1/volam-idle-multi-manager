@@ -481,6 +481,45 @@
     }
   }
 
+  // --- Nhật ký: chuyển các dòng đáng chú ý của khung thông báo game về trang quản lý ---
+  // Game chỉ vẽ dòng nhật ký hệ thống vào #u20lines khi khung thông báo đang ở tab "Hệ thống" (mặc định là "Thế giới"),
+  // nên lần đầu sau khi tải khung script bấm sang tab đó một lần (bạn đổi lại thì thôi, không ép nữa). Mỗi giây so danh sách
+  // dòng hiện có với lần trước để tìm dòng mới, chỉ gửi những dòng khớp LOG_NOTABLE (đồ Hoàng Kim / đồ phổ, dị thú, loài thú mới...).
+  const LOG_NOTABLE = /Hoàng Kim|Bạch Kim|Đồ phổ|đồ phổ|Dị thú|loài mới|Thu phục|Thần Mã|TRÚNG LỚN/;
+  let logPrev = null; // các dòng ở lần quét trước (null = chưa quét lần nào: bỏ qua lịch sử có sẵn)
+  let logSwitched = false;
+  const lineDiff = (prev, cur) => {
+    // Danh sách trượt: dòng mới thêm vào cuối, dòng cũ rơi khỏi đầu. Tìm phần cuối của prev trùng với phần đầu của cur.
+    for (let keep = Math.min(prev.length, cur.length); keep >= 0; keep--) {
+      let ok = true;
+      for (let k = 0; k < keep && ok; k++) if (cur[k] !== prev[prev.length - keep + k]) ok = false;
+      if (ok) return cur.slice(keep);
+    }
+    return cur;
+  };
+  function logScan() {
+    const box = q("#u20lines");
+    if (!box || !q("#mswMenu")) {
+      logPrev = null;
+      return;
+    }
+    const ch = box.dataset.lt;
+    if (ch !== "sys" && ch !== "all") {
+      logPrev = null;
+      const b = !logSwitched && q('#u20ct button[data-lt="sys"]');
+      if (b) {
+        logSwitched = true;
+        b.click();
+      }
+      return;
+    }
+    const cur = Array.prototype.map.call(box.children, (el) => el.textContent.replace(/\s+/g, " ").trim()).filter(Boolean);
+    const fresh = logPrev ? lineDiff(logPrev, cur) : [];
+    logPrev = cur;
+    const out = fresh.filter((t) => LOG_NOTABLE.test(t) && !(/^Hạ /.test(t) && !/Đồ phổ|đồ phổ/.test(t)));
+    if (out.length) post({ type: "events", lines: out.slice(0, 20) });
+  }
+
   // --- Bắt thú: đi tìm những loài thú chưa có trong Thú điển ---
   // Thú không bắt bằng nút mà rơi ngẫu nhiên khi hạ quái là thú ngoài bãi luyện công (thường 0,1% · tinh anh 1% · trùm 8%),
   // nên "đi bắt" = đứng ở bãi có loài còn thiếu và luyện công. Mỗi vòng: đọc Thú điển (cửa sổ Đồng hành > Thú điển, ô mờ
@@ -1119,5 +1158,6 @@
   setInterval(() => {
     autoSellTick().catch(() => {});
   }, AUTO_SELL_POLL_MS);
+  setInterval(logScan, 1000);
   post({ type: "hello" });
 })();
