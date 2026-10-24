@@ -535,7 +535,7 @@
   //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Số đọc từ bản lưu của game
   //    (chính xác); không có bản lưu thì không ghi.
   //  - tầng tháp leo được trong ngày: cộng phần tầng tăng so với tầng thấy lần trước, ra khỏi tháp vào lại thì đếm tiếp (đọc từ tên bãi trên thanh trên của game)
-  //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã)
+  //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ phổ, Thần Mã)
   // Ngày tính theo giờ Việt Nam (GMT+7) như game.
   // v2: bản v1 có số liệu sai (mốc cấp 1 / 0 lượng lúc khung chưa nạp nhân vật, về sau bị tính thành "kiếm được" cả số đang có) nên bỏ hẳn
   const LOGKEY = "quanly4acc.log.v2";
@@ -670,18 +670,16 @@
     el("h3", "", "Hôm nay (" + today + ")", box);
     const t1 = el("table", "", "", box);
     const r0 = el("tr", "", "", t1);
-    ["Nhân vật", "Cấp", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "KNB chi", "Tầng tháp", "Tầng cao nhất"].forEach((h) => el("th", "", h, r0));
+    ["Nhân vật", "Cấp", "Cấp tăng", "Lượng kiếm", "Lượng chi", "KNB kiếm", "KNB chi", "Tầng tháp", "Tầng cao nhất"].forEach((h) => el("th", "", h, r0));
     chars.forEach((n) => {
       const c = logData[n], d = c.days[today];
       const r = el("tr", "", "", t1);
       el("td", "", n, r);
       el("td", "", c.lv || "-", r);
-      if (!d) { for (let k = 0; k < 8; k++) el("td", "dim", "-", r); return; }
+      if (!d) { for (let k = 0; k < 7; k++) el("td", "dim", "-", r); return; }
       el("td", d.up ? "pos" : "dim", d.up ? "+" + d.up : "0", r);
       el("td", d.earned ? "pos" : "dim", fmtGold(d.earned), r);
       el("td", d.spent ? "neg" : "dim", fmtGold(d.spent), r);
-      const net = d.earned - d.spent;
-      el("td", net >= 0 ? "pos" : "neg", (net > 0 ? "+" : "") + fmtGold(net), r);
       el("td", d.knbIn ? "pos" : "dim", fmtNum(d.knbIn), r);
       el("td", d.knbOut ? "neg" : "dim", fmtNum(d.knbOut), r);
       el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
@@ -693,15 +691,13 @@
       el("h3", "", "Các ngày gần đây", box);
       const t2 = el("table", "", "", box);
       const h2 = el("tr", "", "", t2);
-      ["Ngày", "Cấp tăng", "Lượng kiếm", "Lượng chi", "Ròng", "KNB kiếm", "Tầng tháp"].forEach((h) => el("th", "", h, h2));
+      ["Ngày", "Cấp tăng", "Lượng kiếm", "Lượng chi", "KNB kiếm", "Tầng tháp"].forEach((h) => el("th", "", h, h2));
       Object.keys(c.days).sort().reverse().forEach((day) => {
         const d = c.days[day], r = el("tr", "", "", t2);
         el("td", "", day, r);
         el("td", d.up ? "pos" : "dim", d.up ? "+" + d.up : "0", r);
         el("td", "", fmtGold(d.earned), r);
         el("td", "", fmtGold(d.spent), r);
-        const net = d.earned - d.spent;
-        el("td", net >= 0 ? "pos" : "neg", (net > 0 ? "+" : "") + fmtGold(net), r);
         el("td", "", fmtNum(d.knbIn), r);
         el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
       });
@@ -712,7 +708,7 @@
     chars.forEach((n) => logData[n].events.forEach((e) => evs.push({ n, t: e.t, text: e.text })));
     evs.sort((a, b) => b.t - a.t);
     const ul = el("ul", "", "", box);
-    if (!evs.length) el("li", "dim", "Chưa có. Ghi các dòng nhật ký có Hoàng Kim, Bạch Kim, Đồ phổ, Thần Mã (cần khung thông báo của game ở tab Hệ thống, script tự chuyển sang tab này một lần khi tải khung).", ul);
+    if (!evs.length) el("li", "dim", "Chưa có. Ghi các dòng nhật ký có Đồ phổ, Thần Mã (cần khung thông báo của game ở tab Hệ thống, script tự chuyển sang tab này một lần khi tải khung).", ul);
     evs.slice(0, 100).forEach((e) => {
       const li = el("li", "", "", ul);
       el("time", "", e.t >= Date.parse(today + "T00:00:00+07:00") ? vnTime(e.t) : vnDay(e.t).slice(5) + " " + vnTime(e.t), li);

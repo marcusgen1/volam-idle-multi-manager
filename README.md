@@ -133,7 +133,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   các loài còn thiếu đều ở bãi chưa mở; bấm 🐾 lần nữa hoặc chọn chế độ khác để dừng. Chọn bãi làm game tắt "Tự đổi theo cấp".
   Tải lại khung thì phải bấm lại.
 - **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, số tầng tháp leo được, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
-  số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ Hoàng Kim / Bạch Kim / đồ phổ, Thần Mã; đổi mẫu nhận diện ở
+  số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ phổ, Thần Mã; đổi mẫu nhận diện ở
   `LOG_NOTABLE` trong `agent.js`); có sự kiện mới thì hiện thông báo nhỏ ở góc dưới phải. Số liệu lưu trong `localStorage` của trình duyệt.
   Cấp, ngân lượng, KNB, tầng tháp và tên nhân vật đọc từ bản lưu của chính game (localStorage của khung, game ghi mỗi ~10 giây, chỉ đọc không ghi)
   nên chính xác và vẫn cập nhật khi trang ở tab nền (thanh trên của game chỉ được vẽ lại khi khung đang được nhìn thấy, còn số mặc định cấp 1 / 0 lượng nếu chưa vẽ nên không dùng). Chỉ ghi số tăng / giảm so với lần đọc trước, lần đọc đầu chỉ đặt mốc. "Kiếm" cộng các lần số tăng,
