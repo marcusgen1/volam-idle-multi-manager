@@ -1,7 +1,7 @@
 # Võ Lâm Idle – Quản lý nhiều nhân vật
 
 Trang quản lý chạy **nhiều cửa sổ game cạnh nhau trong một trang** (mặc định 4, thêm được tới 12), mỗi cửa sổ đăng nhập một tài khoản riêng,
-kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh, đóng/gửi bình Phúc Duyên…).
+kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh, đóng bình / dùng hết bình / mở hết rương Phúc Duyên…).
 
 > Repo riêng tư. Không chứa mã của game: máy chủ cục bộ chuyển tiếp trang game từ `https://volamidle.pages.dev` lúc chạy.
 
@@ -124,8 +124,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Nhiệm Vụ / Phó Bản tự về Luyện Công khi hết việc; Leo Tháp tự vào lại khi gục ngã và dừng sau 3 lần chết liên tiếp.
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
 - **Bán đồ xanh** (thủ công + tự bán khi hành trang đầy), tùy chọn gồm cả đồ game đang giữ.
-- **Đóng bình** Phúc Duyên và **Gửi bình** (một thư gộp cả Đại / Trung / Tiểu) cho một nhân vật. Tên người nhận
-  nằm ở hằng số `PD_TO` trong `quan-ly-4-acc/app.html`.
+- **Đóng bình** Phúc Duyên (🎐), **Dùng bình** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
+  và **Mở hết** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.
 - Bố cục 2×2 hoặc 4 cột, phóng to / tắt từng khung. **Dùng bố cục 2×2 khi chạy Nhiệm Vụ**: ở 4 cột game không vẽ khung
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ.
 
@@ -135,4 +135,4 @@ Mật khẩu **không** được lưu trong trang này; hãy dùng "Nhớ tài k
 
 - Các script chỉ bấm những nút có sẵn trên giao diện game, nhưng vẫn là tự động hóa. Hãy tuân theo luật của game.
 - Script đọc giao diện game theo tên phần tử hiện tại. Khi game cập nhật có thể cần chỉnh lại `agent.js`.
-- Gửi thư và bán đồ **không hoàn tác được**.
+- Bán đồ, dùng bình và mở rương **không hoàn tác được**.
