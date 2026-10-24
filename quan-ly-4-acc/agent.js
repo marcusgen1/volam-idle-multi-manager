@@ -406,8 +406,65 @@
     closeModalBtn();
     return out;
   }
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo };
+  // Mở hết Hồng Bao / Đại Hồng Bao (lưu trên máy chủ, dùng chung cả tài khoản): mở cửa sổ "🧧 Hồng Bao" của game rồi bấm
+  // [Mở ×N] (tối đa 10 cái mỗi lần, nút này khóa khi chỉ còn 1) hoặc [Mở 1] cho tới khi hết. Sau mỗi lần bấm game khóa nút,
+  // gọi máy chủ rồi vẽ lại cửa sổ với số còn lại, nên chờ số còn lại đổi (hoặc báo lỗi nếu không đổi).
+  const hbCount = (kind) => {
+    const btn = q('#mBody [data-hbo="' + kind + '"]');
+    const b = btn && btn.parentElement && btn.parentElement.querySelector("b");
+    return b ? digits(String(b.textContent).split(":").pop()) : -1; // -1 = không đọc được
+  };
+  async function pdHb() {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    // Game mở cửa sổ Hồng Bao khi bấm vào phần tử có id bHbOpen (nút 🧧 trong Hành trang)
+    const el = document.createElement("span");
+    el.id = "bHbOpen";
+    document.body.appendChild(el);
+    el.click();
+    el.remove();
+    if (!(await waitFor(() => q("#mBody [data-hbo]"), 8000))) {
+      closeModalBtn();
+      return toastText() || "không mở được cửa sổ Hồng Bao (cần đăng nhập máy chủ)";
+    }
+    await wait(500);
+    const gold0 = readText("#gold");
+    const knb0 = readText("#knbTop");
+    const opened = { hb: 0, dhb: 0 };
+    let stop = "";
+    for (const kind of ["hb", "dhb"]) {
+      for (let guard = 0; guard < 300 && !stop; guard++) {
+        const n = hbCount(kind);
+        if (n < 0) {
+          stop = "không đọc được số Hồng Bao";
+          break;
+        }
+        if (n === 0) break;
+        const btns = qa('#mBody [data-hbo="' + kind + '"]').filter((b) => !b.disabled);
+        const btn = btns[btns.length - 1];
+        if (!btn) {
+          stop = "nút mở bị khóa";
+          break;
+        }
+        btn.click();
+        const moved = await waitFor(() => hbCount(kind) !== n && q('#mBody [data-hbo="' + kind + '"]:not([disabled])') || hbCount(kind) === 0, 20000);
+        if (!moved) {
+          stop = toastText() || "máy chủ không trả lời";
+          break;
+        }
+        opened[kind] += Math.max(0, n - Math.max(0, hbCount(kind)));
+      }
+    }
+    closeModalBtn();
+    const parts = [];
+    if (opened.hb) parts.push(opened.hb + " Hồng Bao");
+    if (opened.dhb) parts.push(opened.dhb + " Đại Hồng Bao");
+    const gain = parts.length ? " · lượng " + gold0 + " → " + readText("#gold") + " · KNB " + knb0 + " → " + readText("#knbTop") : "";
+    if (!parts.length) return stop || "không có Hồng Bao nào";
+    return "đã mở " + parts.join(" + ") + gain + (stop ? " · dừng: " + stop : "");
+  }
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb };
   async function runPd(kind) {
     if (pdRun) return;
     pdRun = true;
