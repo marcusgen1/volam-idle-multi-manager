@@ -534,7 +534,7 @@
   //  - cấp tăng trong ngày: cộng các lần cấp tăng (đọc từ thanh trên của game)
   //  - lượng / Kim Nguyên Bảo kiếm được: cộng các lần SỐ TĂNG; chi: cộng các lần giảm (mua, đổi...). Game chỉ hiện số rút gọn
   //    ("12,3 vạn", "12.3k") nên có sai số nhỏ ở số lớn.
-  //  - tầng tháp leo được trong ngày: cộng các lần tầng tăng khi đang ở trong tháp (đọc từ tên bãi trên thanh trên của game)
+  //  - tầng tháp leo được trong ngày: cộng phần tầng tăng so với tầng thấy lần trước, ra khỏi tháp vào lại thì đếm tiếp (đọc từ tên bãi trên thanh trên của game)
   //  - sự kiện đáng chú ý: dòng nhật ký game khớp LOG_NOTABLE trong agent.js (đồ Hoàng Kim / đồ phổ, dị thú, loài thú mới...)
   // Ngày tính theo giờ Việt Nam (GMT+7) như game.
   const LOGKEY = "quanly4acc.log.v1";
@@ -588,11 +588,14 @@
       if (dg > 0) d.earned += dg; else if (dg < 0) d.spent -= dg;
       const dk = knb - last.knb;
       if (dk > 0) d.knbIn += dk; else if (dk < 0) d.knbOut -= dk;
-      // Tầng tháp: cộng mỗi lần tầng tăng khi vẫn đang ở trong tháp (vào lại tháp giữa chừng thì tính từ tầng lúc vào)
-      if (tw > 0 && (c.twNow | 0) > 0 && tw > c.twNow) d.tw = (d.tw | 0) + tw - c.twNow;
+      // Tầng tháp: cộng phần tầng tăng so với tầng thấy lần trước (c.twPos). Ra khỏi tháp thì giữ nguyên mốc, vào lại
+      // (game vào lại đúng tầng đã rời) thì đếm tiếp từ đó. Sang ngày mới số đếm về 0 nhưng mốc vẫn giữ.
+      if (tw > 0 && (c.twPos | 0) > 0 && tw > c.twPos) d.tw = (d.tw | 0) + tw - c.twPos;
     }
-    if (tw > 0) d.twMax = Math.max(d.twMax | 0, tw);
-    c.twNow = tw;
+    if (tw > 0) {
+      d.twMax = Math.max(d.twMax | 0, tw);
+      c.twPos = tw;
+    }
     c.last = { lvl, gold, knb, t: Date.now() };
     c.lv = lvl;
     logTrim(c);
