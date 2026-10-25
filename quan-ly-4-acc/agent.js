@@ -880,7 +880,7 @@
   }
 
   // Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa: Kỳ Trân Các > bảng "🔒 Bảng KNB khóa" > thẻ "Ủy thác & nhiệm vụ" > card Lệnh Bài Dã Tẩu
-  // (2 KNB khóa / cái, tối đa 100 cái mỗi ngày; chữ trên card: "Hôm nay X/100 · có N"). Bấm [×10] (mua tối đa 10 cái) rồi [Mua] cho tới khi
+  // (giá và số lượng tối đa mỗi ngày đọc từ card, không cố định trong code; chữ trên card: "Hôm nay X/Y · có N"). Bấm [×10] (mua tối đa 10 cái) rồi [Mua] cho tới khi
   // nút bị khóa (đủ số lượt trong ngày hoặc hết KNB khóa) hoặc game báo lỗi. Sau mỗi lần bấm game vẽ lại cửa sổ với số "Hôm nay" mới.
   async function pdLdt() {
     if (!q("#mswMenu")) return "Chưa vào game";

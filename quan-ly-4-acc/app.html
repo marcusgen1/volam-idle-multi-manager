@@ -526,10 +526,10 @@
   allBox.appendChild(unlockBtn);
   const ldtBtn = document.createElement("button");
   ldtBtn.textContent = "🎫 Mua lệnh bài Dã Tẩu";
-  ldtBtn.title = "Tất cả nhân vật: mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các (2 KNB khóa / cái, tối đa 100 cái mỗi ngày)";
+  ldtBtn.title = "Tất cả nhân vật: mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các (giá và số lượng tối đa mỗi ngày theo Kỳ Trân Các của game)";
   ldtBtn.onclick = () => {
     const idxs = activeSlots();
-    if (idxs.length && confirm("Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở " + idxs.length + " khung đang bật?\n\n2 KNB khóa / cái, tối đa 100 cái mỗi ngày; sẽ dùng tới hết KNB khóa. Không hoàn tác.")) {
+    if (idxs.length && confirm("Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở " + idxs.length + " khung đang bật?\n\nGiá theo Kỳ Trân Các; sẽ mua cho tới khi đủ số lượng tối đa trong ngày hoặc hết KNB khóa. Không hoàn tác.")) {
       idxs.forEach((i) => sendPd(i, "ldt"));
     }
   };
