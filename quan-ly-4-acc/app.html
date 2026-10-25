@@ -506,6 +506,16 @@
   nguaBtn.title = "Tất cả nhân vật: mở hết Rương Ngựa đang có (qua Kỳ Trân Các > Thú cưỡi > Dùng, mỗi lần mở 1 rương; ngựa vào hành trang, cần còn chỗ trống)";
   nguaBtn.onclick = () => forOn((i) => sendPd(i, "ngua"));
   allBox.appendChild(nguaBtn);
+  const unlockBtn = document.createElement("button");
+  unlockBtn.textContent = "🔓 Mở khóa đồ HK";
+  unlockBtn.title = "Tất cả nhân vật: mở khóa nhanh mọi món Hoàng Kim đang khóa 🔒 trong hành trang (game chỉ có nút mở khóa từng món). Ngựa, Bạch Kim, đồ tím… và ô 📜 giữ cho Dã Tẩu không đổi.";
+  unlockBtn.onclick = () => {
+    const idxs = activeSlots();
+    if (idxs.length && confirm("Mở khóa TẤT CẢ đồ Hoàng Kim đang khóa 🔒 trong hành trang của " + idxs.length + " khung đang bật?\n\nMón hết khóa sẽ không còn được bảo vệ khi Dọn kho / bán đồ (kể cả Bán Xanh + HK cơ bản và Tự bán). Ngựa, Bạch Kim và đồ khác giữ nguyên khóa.")) {
+      idxs.forEach((i) => sendPd(i, "unlock"));
+    }
+  };
+  allBox.appendChild(unlockBtn);
   // Đổi ngân lượng → KNB (giữ lại tối thiểu một số vạn lượng) và gửi hết KNB cho nhân vật khác bằng thư.
   // Hai việc này không hoàn tác được (game không cho đổi ngược KNB → lượng) nên nút "tất cả" hỏi lại trước khi chạy.
   const labelEl = (text) => { const e = document.createElement("span"); e.textContent = text; return e; };

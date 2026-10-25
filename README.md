@@ -140,6 +140,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   - Gửi: mở Hộp thư, gửi **toàn bộ KNB** đang có cho nhân vật ở ô "Gửi KNB cho nhân vật" (không kèm đồ, không phải thư giao dịch). Chỉ dùng được với tài khoản online.
 - **Mở rương ngựa** (🐎, mục Tất cả): mở hết Rương Ngựa đang có bằng đúng nút của game (Kỳ Trân Các › "💰 Bảng Kim Nguyên Bảo" › thẻ "Thú cưỡi" ›
   Dùng; mỗi lần bấm mở 1 rương, ngựa vào hành trang, Quý trở lên tự khóa). Dừng khi hết rương hoặc game báo lỗi (ví dụ "Hành trang đầy").
+- **Mở khóa đồ HK** (🔓, mục Tất cả, hỏi xác nhận): mở khóa nhanh mọi món **Hoàng Kim** (ô lớp `r4`) đang khóa 🔒 trong hành trang (game chỉ có nút mở khóa từng món nên script
+  bấm lần lượt: ô › Mở khóa). Ngựa, Bạch Kim, đồ tím… và ô 📜 (giữ cho Dã Tẩu) không đổi; món không khóa được bị bỏ qua. Món hết khóa không còn được bảo vệ khi Dọn kho / bán đồ.
 - **Gửi đồ Hoàng Kim** (📨, mục Tất cả, dùng chung ô tên người nhận với Gửi hết KNB; hỏi xác nhận, không hoàn tác): mở Hộp thư rồi gửi mọi món
   Hoàng Kim trong hành trang (ô có lớp `r4`), mỗi thư tối đa 10 món (giới hạn của game) và lặp tới khi hết. Đồ khóa 🔒, đồ giữ cho Dã Tẩu,
   đồ đang mặc và đồ Bạch Kim được giữ lại. Gửi bằng thư thường (không phải thư giao dịch).
