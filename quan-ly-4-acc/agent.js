@@ -747,10 +747,10 @@
     }
   }
 
-  // Mở khóa nhanh đồ trong hành trang: game chỉ mở khóa từng món (chi tiết món > [Mở khóa]), không có nút mở khóa hàng loạt.
-  // Duyệt các ô có biểu tượng 🔒 ở thẻ Hành trang, bấm ô, bấm [Mở khóa]. Ô 📜 (giữ cho Dã Tẩu) không phải khóa nên bỏ qua;
-  // món không khóa được (không có nút Khóa / Mở khóa) cũng bỏ qua.
-  const lockedTiles = () => qa("#t-inv .invgrid .it").filter((el) => /🔒/.test((el.querySelector(".lk") || {}).textContent || ""));
+  // Mở khóa nhanh đồ Hoàng Kim trong hành trang: game chỉ mở khóa từng món (chi tiết món > [Mở khóa]), không có nút mở khóa hàng loạt.
+  // Duyệt các ô Hoàng Kim (lớp r4) có biểu tượng 🔒 ở thẻ Hành trang, bấm ô, bấm [Mở khóa]. Đồ khác (ngựa, Bạch Kim, đồ tím…) giữ nguyên khóa;
+  // ô 📜 (giữ cho Dã Tẩu) không phải khóa nên bỏ qua; món không khóa được (không có nút Mở khóa) cũng bỏ qua.
+  const lockedTiles = () => qa("#t-inv .invgrid .it.r4").filter((el) => /🔒/.test((el.querySelector(".lk") || {}).textContent || ""));
   async function pdMoKhoa() {
     if (!q("#mswMenu")) return "Chưa vào game";
     if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
@@ -762,7 +762,7 @@
     try {
       await wait(200);
       const before = lockedTiles().length;
-      if (!before) return "không có món nào đang khóa trong hành trang";
+      if (!before) return "không có món Hoàng Kim nào đang khóa trong hành trang";
       let done = 0;
       const tried = new Set();
       for (let guard = 0; guard < 400; guard++) {
@@ -779,7 +779,7 @@
         await wait(60);
       }
       const left = lockedTiles().length;
-      return "đã mở khóa " + done + "/" + before + " món" + (left ? " · còn " + left + " món khóa (không mở khóa được)" : "");
+      return "đã mở khóa " + done + "/" + before + " món Hoàng Kim" + (left ? " · còn " + left + " món khóa (không mở khóa được)" : "");
     } finally {
       petUi = false;
       closeModalBtn();
@@ -787,7 +787,7 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ" };
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK" };
   const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa };
   async function runPd(kind, m) {
     if (pdRun) return;

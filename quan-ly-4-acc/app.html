@@ -507,11 +507,11 @@
   nguaBtn.onclick = () => forOn((i) => sendPd(i, "ngua"));
   allBox.appendChild(nguaBtn);
   const unlockBtn = document.createElement("button");
-  unlockBtn.textContent = "🔓 Mở khóa đồ";
-  unlockBtn.title = "Tất cả nhân vật: mở khóa nhanh mọi món đang khóa 🔒 trong hành trang (game chỉ có nút mở khóa từng món). Món 📜 giữ cho Dã Tẩu không phải khóa nên không đổi.";
+  unlockBtn.textContent = "🔓 Mở khóa đồ HK";
+  unlockBtn.title = "Tất cả nhân vật: mở khóa nhanh mọi món Hoàng Kim đang khóa 🔒 trong hành trang (game chỉ có nút mở khóa từng món). Ngựa, Bạch Kim, đồ tím… và ô 📜 giữ cho Dã Tẩu không đổi.";
   unlockBtn.onclick = () => {
     const idxs = activeSlots();
-    if (idxs.length && confirm("Mở khóa TẤT CẢ món đang khóa 🔒 trong hành trang của " + idxs.length + " khung đang bật?\n\nMón hết khóa sẽ không còn được bảo vệ khi Dọn kho / bán đồ (kể cả Tự bán), và ngựa Quý trở lên (game tự khóa) cũng mở khóa.")) {
+    if (idxs.length && confirm("Mở khóa TẤT CẢ đồ Hoàng Kim đang khóa 🔒 trong hành trang của " + idxs.length + " khung đang bật?\n\nMón hết khóa sẽ không còn được bảo vệ khi Dọn kho / bán đồ (kể cả Bán Xanh + HK cơ bản và Tự bán). Ngựa, Bạch Kim và đồ khác giữ nguyên khóa.")) {
       idxs.forEach((i) => sendPd(i, "unlock"));
     }
   };
