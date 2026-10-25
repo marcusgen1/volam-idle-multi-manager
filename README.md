@@ -1,7 +1,7 @@
 # Võ Lâm Idle – Quản lý nhiều nhân vật
 
 Trang quản lý chạy **nhiều cửa sổ game cạnh nhau trong một trang** (mặc định và tối đa 4; muốn nhiều hơn thì đặt `VL_SLOTS`), mỗi cửa sổ đăng nhập một tài khoản riêng,
-kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh + HK cơ bản, đóng bình / dùng hết bình / mở hết rương Phúc Duyên…).
+kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh, bán HK cơ bản, đóng bình / dùng hết bình / mở hết rương Phúc Duyên…).
 
 > Repo riêng tư. Không chứa mã của game: máy chủ cục bộ chuyển tiếp trang game từ `https://volamidle.pages.dev` lúc chạy.
 
@@ -123,9 +123,10 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Ô chọn ngay dưới nút Chạy PB + NV đặt chế độ sau khi chạy xong: Luyện Công (mặc định) hoặc Leo Tháp (áp dụng từ lần bấm kế tiếp).
   Nhiệm Vụ / Phó Bản chạy riêng thì tự về Luyện Công khi hết việc; Leo Tháp tự vào lại khi gục ngã và dừng sau 3 lần chết liên tiếp.
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
-- **Bán Xanh + HK cơ bản** (thủ công + tự bán khi hành trang đầy), tùy chọn gồm cả đồ xanh game đang giữ. Ngoài đồ xanh, nút còn bán lẻ
-  đồ **Hoàng Kim cơ bản** — món có tên bắt đầu bằng Định Quốc, Hiệp Cốt, Kim Phong hoặc Thiên Hoàng — lấy **KNB khóa** (game đổi mỗi món Hoàng Kim 10 KNB khóa).
-  Giữ lại: món khóa 🔒 / đang giữ cho Dã Tẩu, món đã cường hóa (+N), đồ đang mặc, đồ Hoàng Kim bộ khác (An Bang, Môn Phái…) và Bạch Kim.
+- **Bán đồ xanh** (💰; thủ công + **Tự bán** khi hành trang đầy, Tự bán chỉ bán đồ xanh), tùy chọn gồm cả đồ xanh game đang giữ.
+- **Bán HK cơ bản** (🛡, chỉ thủ công, không nằm trong Tự bán): bán lẻ đồ **Hoàng Kim cơ bản** — món có tên bắt đầu bằng Định Quốc, Hiệp Cốt, Kim Phong hoặc
+  Thiên Hoàng — lấy **KNB khóa** (game đổi mỗi món Hoàng Kim 10 KNB khóa). Giữ lại: món khóa 🔒 / đang giữ cho Dã Tẩu, món đã cường hóa (+N), đồ đang mặc,
+  đồ Hoàng Kim bộ khác (An Bang, Môn Phái…), Bạch Kim và đồ xanh.
 - **Đóng bình PD** (🎐), **Dùng bình PD** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
   và **Mở hết PD** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). **Mở hồng bao** (🧧): mở hết Hồng Bao và Đại Hồng Bao đang có
   (lưu trên máy chủ, dùng chung cả tài khoản; mỗi lần bấm game mở tối đa 10 cái nên script bấm lặp tới khi hết). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.
