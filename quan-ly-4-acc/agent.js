@@ -1003,7 +1003,7 @@
     }
   }
 
-  // --- Bán đồ xanh trong Hành trang (thủ công + tự động khi hành trang đầy) ---
+  // --- Bán đồ xanh + Hoàng Kim cơ bản trong Hành trang (thủ công + tự động khi hành trang đầy) ---
   // Dùng đúng màn "🧹 Dọn kho" của game: chỉ bật "Bán đồ xanh" ở Hành trang, bấm "Dọn ngay". Game tự giữ lại món khóa 🔒,
   // đồ đang mặc / tốt hơn đồ đang mặc, đồ cần cho Dã Tẩu, đồ trong Rương Chứa Đồ và đồ xanh bạn đã đặt "giữ" (Trợ Thủ › Nhặt đồ).
   const AUTO_SELL_POLL_MS = 30000; // bao lâu kiểm tra hành trang một lần khi bật tự bán
@@ -1087,6 +1087,40 @@
     }
     return sold;
   }
+  // Bán đồ Hoàng Kim "cơ bản" (bộ Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng: tên món bắt đầu bằng tên bộ) lấy KNB khóa.
+  // Bán lẻ từng món như bán đồ xanh lẻ: bấm ô (lớp r4 = Hoàng Kim), đọc tên ở chi tiết món, [Bán · … KNB khóa], xác nhận.
+  // Giữ lại món khóa 🔒 / đang giữ cho Dã Tẩu 📜 (ô có biểu tượng khóa), món đã cường hóa (+N), bộ khác (An Bang, Hoàng Kim Môn Phái…).
+  const HK_BASIC = /^\s*(?:\[[^\]]*\]\s*)?(?:Định Quốc|Hiệp Cốt|Kim Phong|Thiên Hoàng)(?:\s|$)/;
+  const hkTiles = () => qa("#t-inv .invgrid .it.r4").filter((el) => !el.querySelector(".lk"));
+  async function sellHkBasicTiles() {
+    let sold = 0;
+    const tried = new Set();
+    for (let guard = 0; guard < 150; guard++) {
+      const tile = hkTiles().find((el) => !tried.has(el.dataset.uid));
+      if (!tile) break;
+      tried.add(tile.dataset.uid);
+      tile.click();
+      const name = await waitFor(() => q("#mBody .idet h4"), 2000);
+      const btn = name && q("#bSell");
+      const ok = btn && !btn.disabled && HK_BASIC.test(name.firstChild ? name.firstChild.textContent : name.textContent) && !name.querySelector(".enh") && /KNB khóa/.test(btn.textContent);
+      if (!ok) {
+        closeAnyModal();
+        await wait(60);
+        continue;
+      }
+      btn.click();
+      const ask = await waitFor(() => q("#askBox"), 2000);
+      if (!ask) {
+        closeAnyModal();
+        break;
+      }
+      const yes = ask.querySelector('[data-a="1"]');
+      if (yes) yes.click();
+      if (await waitFor(() => !tile.isConnected, 2500)) sold++;
+      await wait(60);
+    }
+    return sold;
+  }
   async function sellBlue(kept) {
     if (!q("#mswMenu")) return { sold: 0, msg: "Chưa vào game" };
     const modal = q("#modal");
@@ -1143,6 +1177,11 @@
         await wait(150);
         single = await sellBlueTiles();
       }
+      let hk = 0;
+      if (!err) {
+        await wait(150);
+        hk = await sellHkBasicTiles();
+      }
       const left = blueTiles().length;
       const total = bulk + single;
       let msg;
@@ -1155,7 +1194,9 @@
           "Bật ô \"gồm cả đồ được giữ\" nếu muốn bán.";
       else msg = "không có đồ xanh nào để bán";
       if (total > 0 && left > 0) msg += " · còn " + left + " ô xanh (game đang giữ)";
-      return { sold: total, msg, kept: left };
+      if (hk > 0) msg = (total > 0 ? msg + " · " : "") + "bán " + hk + " món HK cơ bản (→ KNB khóa)";
+      else if (total === 0 && !err && left === 0) msg = "không có đồ xanh / HK cơ bản nào để bán";
+      return { sold: total + hk, msg, kept: left };
     } finally {
       restoreTab(prev);
     }
@@ -1163,14 +1204,14 @@
   async function runSell(auto, kept) {
     if (sellRun) return { sold: 0 };
     sellRun = true;
-    sellMsg = (auto ? "Tự bán đồ xanh" : "Bán đồ xanh") + ": đang bán…";
+    sellMsg = (auto ? "Tự bán" : "Bán Xanh + HK cơ bản") + ": đang bán…";
     report(true);
     let r = { sold: 0 };
     try {
       r = await sellBlue(!!kept);
-      sellMsg = (auto ? "Tự bán đồ xanh: " : "Bán đồ xanh: ") + r.msg;
+      sellMsg = (auto ? "Tự bán: " : "Bán Xanh + HK cơ bản: ") + r.msg;
     } catch (err) {
-      sellMsg = "Bán đồ xanh: lỗi " + (err && err.message ? err.message : err);
+      sellMsg = "Bán Xanh + HK cơ bản: lỗi " + (err && err.message ? err.message : err);
     } finally {
       sellRun = false;
       report(true);
