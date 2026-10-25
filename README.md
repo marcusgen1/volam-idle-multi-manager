@@ -146,8 +146,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   giá và số lượng tối đa mỗi ngày theo Kỳ Trân Các của game, script đọc từ card chứ không ghi cứng). Bấm ×10 rồi Mua cho tới khi đủ số lượng trong ngày hoặc hết KNB khóa;
   báo số đã mua, KNB khóa đã dùng (= số lượng × giá trên card) và "hôm nay X/Y".
 - **Gửi đồ Hoàng Kim** (📨, mục Tất cả, dùng chung ô tên người nhận với Gửi hết KNB; hỏi xác nhận, không hoàn tác): mở Hộp thư rồi gửi mọi món
-  Hoàng Kim trong hành trang (ô có lớp `r4`), mỗi thư tối đa 10 món (giới hạn của game) và lặp tới khi hết. Đồ khóa 🔒, đồ giữ cho Dã Tẩu,
-  đồ đang mặc và đồ Bạch Kim được giữ lại. Gửi bằng thư thường (không phải thư giao dịch).
+  Hoàng Kim trong hành trang (ô có lớp `r4`), mỗi thư tối đa 10 món (giới hạn của game) và lặp tới khi hết. **Gồm cả món đã khóa 🔒** (game cho gửi thư món khóa; khóa chỉ chặn
+  tự bán / bán Chợ). Giữ lại: ô 📜 (giữ cho Dã Tẩu), đồ đang mặc và đồ Bạch Kim. Gửi bằng thư thường (không phải thư giao dịch). Không thấy món nào thì báo kèm các độ hiếm đang có trong hành trang.
 - **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, số tầng tháp leo được, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
   số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ phổ, Thần Mã; đổi mẫu nhận diện ở
   `LOG_NOTABLE` trong `agent.js`); có sự kiện mới thì hiện thông báo nhỏ ở góc dưới phải. Số liệu lưu trong `localStorage` của trình duyệt.
