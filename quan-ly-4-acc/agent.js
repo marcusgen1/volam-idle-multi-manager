@@ -475,7 +475,7 @@
     if (!parts.length) return stop || "không có Hồng Bao nào";
     return "đã mở " + parts.join(" + ") + gain + (stop ? " · dừng: " + stop : "");
   }
-  // Đổi ngân lượng thành KNB ở Kỳ Trân Các (thẻ đầu, thẻ "Kim Nguyên Bảo": 1 KNB = 10 vạn lượng, tối đa 10.000 KNB mỗi ngày):
+  // Đổi ngân lượng thành KNB ở Kỳ Trân Các (bảng "💰 Bảng Kim Nguyên Bảo", mục "Đổi KNB": 1 KNB = 10 vạn lượng, giới hạn mỗi ngày — hiện 5.000):
   // tính số KNB đổi được từ ngân lượng trong bản lưu (trừ phần giữ lại) rồi bấm [×100] / [×10] / [Mua] cho tới khi đủ.
   // Nút nào bị khóa (hết giới hạn ngày) thì hạ xuống cỡ nhỏ hơn. Bản lưu có thể cũ tới ~10 giây (ngân lượng mới kiếm chưa tính)
   // nên chỉ có thể đổi ít hơn một chút chứ không đổi quá.
@@ -493,15 +493,29 @@
     petUi = true;
     try {
       open.click();
-      let card = await waitFor(() => q('#mBody [data-ktc="knb"]'), 4000);
+      const findCard = () => q('#mBody [data-ktc="knb"]');
+      let card = await waitFor(findCard, 3000);
       if (!card) {
-        const tab = q('#mBody [data-kc="0"]');
-        if (tab) tab.click();
-        card = await waitFor(() => q('#mBody [data-ktc="knb"]'), 4000);
+        // Bản game có hai bảng: KNB (đổi từ lượng) nằm ở "💰 Bảng Kim Nguyên Bảo", bảng mặc định là "🔒 Bảng KNB khóa"
+        const board = q('#mBody [data-kb="1"]');
+        if (board) {
+          board.click();
+          card = await waitFor(findCard, 3000);
+        }
       }
       if (!card) {
+        // Bản cũ chỉ có thẻ danh mục: bấm thẻ "Đổi KNB" (hoặc thẻ đầu)
+        const tabs = qa("#mBody [data-kc]");
+        const tab = tabs.find((b) => /Đổi KNB/.test(b.textContent)) || tabs[0];
+        if (tab) {
+          tab.click();
+          card = await waitFor(findCard, 3000);
+        }
+      }
+      if (!card) {
+        const seen = qa("#mBody [data-kb], #mBody [data-kc]").map((b) => b.textContent.trim()).join(" | ");
         closeModalBtn();
-        return "không mở được Kỳ Trân Các";
+        return "không thấy mục đổi KNB trong Kỳ Trân Các" + (seen ? " (đang hiện: " + seen + ")" : " (cửa sổ không mở)");
       }
       const before = sv.knb;
       let bought = 0;
@@ -514,7 +528,7 @@
           stop = "không thấy nút mua KNB";
         } else if (btn.disabled) {
           if (step > 1) maxStep = step === 100 ? 10 : 1; // hết giới hạn ngày / không đủ cho cỡ này: thử cỡ nhỏ hơn
-          else stop = "đã tới giới hạn đổi trong ngày (10.000 KNB) hoặc không đủ ngân lượng";
+          else stop = "đã tới giới hạn đổi trong ngày hoặc không đủ ngân lượng";
         } else {
           btn.click();
           bought += step;
