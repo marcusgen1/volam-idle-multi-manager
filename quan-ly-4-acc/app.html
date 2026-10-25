@@ -168,6 +168,7 @@
   const sendPd = (i, kind) => post(i, { type: "pd", kind });
 
   const sendSell = (i) => post(i, { type: "sell", kept: !!state.sellKept });
+  const sendSellHk = (i) => post(i, { type: "sell", what: "hk" });
   const sendAutoSell = (i) => post(i, { type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept });
   const sendBoss = (i) => post(i, { type: "boss" });
   const sendPet = (i, on) => post(i, { type: "pet", on: !!on });
@@ -311,7 +312,8 @@
       '<button class="sm" data-m="combo" title="Chạy PB + NV: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công hoặc Leo Tháp (chọn ở menu bên trái)" aria-label="Chạy tất cả">▶</button>' +
       '<button class="sm" data-boss title="Boss tuần: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng)" aria-label="Boss tuần">👹</button>' +
       '<button class="sm" data-pet title="Bắt thú: bật / tắt đi tìm những loài thú chưa có trong Thú điển (đứng ở bãi có loài còn thiếu và luyện công)" aria-label="Bắt thú">🐾</button>' +
-      '<button class="sm" data-sell title="Bán Xanh + HK cơ bản: bán đồ xanh và đồ Hoàng Kim cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng; lấy KNB khóa) trong hành trang (đồ khóa, đồ đang mặc, đồ cường hóa, đồ bạn đặt giữ được giữ lại)" aria-label="Bán Xanh + HK cơ bản">💰</button>' +
+      '<button class="sm" data-sell title="Bán đồ xanh trong hành trang (đồ khóa, đồ đang mặc, đồ bạn đặt giữ được giữ lại)" aria-label="Bán đồ xanh">💰</button>' +
+      '<button class="sm" data-sellhk title="Bán HK cơ bản: bán đồ Hoàng Kim cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) lấy KNB khóa; giữ món khóa, món đã cường hóa và bộ khác" aria-label="Bán HK cơ bản">🛡</button>' +
       '<button class="sm" data-pdd title="Đóng bình PD: đóng hết Phúc Duyên chờ đóng thành bình Đại / Trung / Tiểu" aria-label="Đóng bình">🎐</button>' +
       '<button class="sm" data-pdu title="Dùng bình PD: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
       '<button class="sm" data-pdh title="Mở hồng bao: mở hết Hồng Bao và Đại Hồng Bao đang có (lượng / Kim Nguyên Bảo ngẫu nhiên)" aria-label="Mở hồng bao">🧧</button>' +
@@ -328,6 +330,7 @@
     slot.querySelector("[data-boss]").onclick = () => sendBoss(idx());
     slot.querySelector("[data-pet]").onclick = () => setPet(idx(), !state.slots[idx()].pet);
     slot.querySelector("[data-sell]").onclick = () => sendSell(idx());
+    slot.querySelector("[data-sellhk]").onclick = () => sendSellHk(idx());
     slot.querySelector("[data-pdd]").onclick = () => sendPd(idx(), "dong");
     slot.querySelector("[data-pdu]").onclick = () => sendPd(idx(), "dung");
     slot.querySelector("[data-pdo]").onclick = () => sendPd(idx(), "mo");
@@ -441,10 +444,15 @@
   renderPetBtn();
   allBox.appendChild(petBtn);
   const sellBtn = document.createElement("button");
-  sellBtn.textContent = "💰 Bán Xanh + HK cơ bản";
-  sellBtn.title = "Tất cả nhân vật: bán đồ xanh trong hành trang và đồ Hoàng Kim cơ bản (bộ Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng; lấy KNB khóa) ngay bây giờ. Giữ lại món khóa 🔒, món đã cường hóa và các bộ khác.";
+  sellBtn.textContent = "💰 Bán đồ xanh";
+  sellBtn.title = "Tất cả nhân vật: bán đồ xanh trong hành trang ngay bây giờ";
   sellBtn.onclick = () => forOn(sendSell);
   allBox.appendChild(sellBtn);
+  const sellHkBtn = document.createElement("button");
+  sellHkBtn.textContent = "🛡 Bán HK cơ bản";
+  sellHkBtn.title = "Tất cả nhân vật: bán đồ Hoàng Kim cơ bản (bộ Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) lấy KNB khóa. Giữ lại món khóa 🔒, món đã cường hóa, các bộ khác và đồ xanh. Không nằm trong Tự bán.";
+  sellHkBtn.onclick = () => forOn(sendSellHk);
+  allBox.appendChild(sellHkBtn);
   const autoBtn = document.createElement("button");
   const renderAuto = () => {
     autoBtn.textContent = "🔁 Tự bán: " + (state.autoSell ? "BẬT" : "TẮT");
