@@ -480,25 +480,32 @@
   // Nút nào bị khóa (hết giới hạn ngày) thì hạ xuống cỡ nhỏ hơn. Bản lưu có thể cũ tới ~10 giây (ngân lượng mới kiếm chưa tính)
   // nên chỉ có thể đổi ít hơn một chút chứ không đổi quá.
   // Mở Kỳ Trân Các và tìm một phần tử trong cửa sổ. Bản game có hai bảng ("🔒 Bảng KNB khóa" mặc định, "💰 Bảng Kim Nguyên Bảo")
-  // và các thẻ danh mục theo bảng: tìm ngay, chưa thấy thì bấm sang bảng Kim Nguyên Bảo, rồi bấm thẻ có chữ khớp tabRe
-  // (bản cũ chỉ có thẻ danh mục). Trả về { el } hoặc { err }; lỗi kèm tên các nút đang hiện để dễ chẩn đoán.
+  // và các thẻ danh mục theo bảng: tìm ngay; chưa thấy thì bấm thẻ danh mục có chữ khớp tabRe ở bảng đang xem; chưa thấy nữa thì
+  // chuyển sang bảng còn lại (mỗi bảng tự chọn thẻ đầu) rồi thử lại; cuối cùng (bản cũ chỉ có thẻ danh mục) bấm thẻ đầu tiên.
+  // Trả về { el } hoặc { err }; lỗi kèm tên các nút đang hiện để dễ chẩn đoán.
   async function openKtc(findEl, tabRe) {
     const open = q("#u20ktc") || q("#ktcBtn");
     if (!open) return { err: "không thấy nút Kỳ Trân Các" };
     open.click();
+    const tryTab = async () => {
+      const tab = qa("#mBody [data-kc]").find((b) => tabRe.test(b.textContent));
+      if (!tab) return null;
+      tab.click();
+      return await waitFor(findEl, 3000);
+    };
     let el = await waitFor(findEl, 3000);
+    if (!el) el = await tryTab();
     if (!el) {
-      const board = q('#mBody [data-kb="1"]');
-      if (board) {
-        board.click();
-        el = await waitFor(findEl, 3000);
+      for (const b of qa("#mBody [data-kb]").filter((x) => !x.classList.contains("on"))) {
+        b.click();
+        el = (await waitFor(findEl, 2000)) || (await tryTab());
+        if (el) break;
       }
     }
     if (!el) {
-      const tabs = qa("#mBody [data-kc]");
-      const tab = tabs.find((b) => tabRe.test(b.textContent)) || tabs[0];
-      if (tab) {
-        tab.click();
+      const first = q("#mBody [data-kc]");
+      if (first) {
+        first.click();
         el = await waitFor(findEl, 3000);
       }
     }
@@ -872,8 +879,81 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa };
+  // Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa: Kỳ Trân Các > bảng "🔒 Bảng KNB khóa" > thẻ "Ủy thác & nhiệm vụ" > card Lệnh Bài Dã Tẩu
+  // (giá và số lượng tối đa mỗi ngày đọc từ card, không cố định trong code; chữ trên card: "Hôm nay X/Y · có N"). Bấm [×10] (mua tối đa 10 cái) rồi [Mua] cho tới khi
+  // nút bị khóa (đủ số lượt trong ngày hoặc hết KNB khóa) hoặc game báo lỗi. Sau mỗi lần bấm game vẽ lại cửa sổ với số "Hôm nay" mới.
+  async function pdLdt() {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    petUi = true;
+    try {
+      const found = await openKtc(() => q('#mBody [data-ktc="ldt"]'), /Ủy thác|nhiệm vụ/i);
+      if (found.err) return found.err;
+      const card = () => {
+        const b = q('#mBody [data-ktc="ldt"]');
+        return b && b.closest(".u2card, .shoprow");
+      };
+      const status = () => {
+        const c = card();
+        const m = c && c.textContent.match(/Hôm nay\s*(\d+)\s*\/\s*(\d+)/);
+        return m ? { used: +m[1], cap: +m[2] } : null;
+      };
+      const price = (() => {
+        const c = card();
+        const m = c && c.textContent.match(/(\d+)\s*KNB/);
+        return m ? +m[1] : 0;
+      })();
+      let bought = 0;
+      let stop = "";
+      for (let guard = 0; guard < 200 && !stop; guard++) {
+        const b1 = q('#mBody [data-ktc="ldt"]');
+        if (!b1) {
+          stop = "mất nút Mua";
+          break;
+        }
+        const st = status();
+        if (st && st.used >= st.cap) {
+          stop = "đã mua đủ " + st.cap + " lệnh bài hôm nay";
+          break;
+        }
+        const b10 = q('#mBody [data-ktc10="ldt"]');
+        const btn = b10 && !b10.disabled ? b10 : !b1.disabled ? b1 : null;
+        if (!btn) {
+          stop = "không đủ KNB khóa" + (st ? " (hôm nay " + st.used + "/" + st.cap + ")" : "");
+          break;
+        }
+        const before = st ? st.used : -1;
+        await waitFor(() => !toastOn(), 2500);
+        btn.click();
+        let toast = "";
+        const after = await waitFor(() => {
+          toast = toastOn() || toast;
+          const s2 = status();
+          if (s2 && s2.used > before) return s2;
+          return TOAST_ERR.test(toast) ? { err: toast } : null; // game báo lỗi (thiếu KNB khóa, đạt giới hạn…)
+        }, 15000);
+        if (!after) {
+          stop = toast || "game không phản hồi";
+          break;
+        }
+        if (after.err) {
+          stop = after.err;
+          break;
+        }
+        bought += after.used - before;
+        await waitFor(() => !toastOn(), 2500);
+      }
+      const st = status();
+      closeModalBtn();
+      if (!bought) return stop ? "không mua được: " + stop : "không mua được lệnh bài nào";
+      return "đã mua " + bought + " Lệnh Bài Dã Tẩu" + (price ? " (−" + bought * price + " KNB khóa)" : "") + (st ? " · hôm nay " + st.used + "/" + st.cap : "") + (stop ? " · dừng: " + stop : "");
+    } finally {
+      petUi = false;
+    }
+  }
+
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
