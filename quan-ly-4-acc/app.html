@@ -57,6 +57,7 @@
   #logBox th, #logBox td { text-align:right; padding:2px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
   #logBox th:first-child, #logBox td:first-child { text-align:left; }
   #logBox th { color:var(--dim); font-weight:400; }
+  #logBox tr.tot td { font-weight:600; border-top:1px solid var(--accent); }
   #logBox .pos { color:var(--ok); } #logBox .neg { color:#e27a6a; } #logBox .dim { color:var(--dim); }
   #logBox ul { list-style:none; margin:0; padding:0; max-height:42vh; overflow:auto; font-size:12px; }
   #logBox li { padding:2px 0; border-bottom:1px solid var(--line); } #logBox li time { color:var(--dim); margin-right:6px; }
@@ -167,7 +168,15 @@
   const sendSell = (i) => post(i, { type: "sell", kept: !!state.sellKept });
   const sendAutoSell = (i) => post(i, { type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept });
   const sendBoss = (i) => post(i, { type: "boss" });
-  const sendPet = (i) => post(i, { type: "pet" });
+  const sendPet = (i, on) => post(i, { type: "pet", on: !!on });
+  // Bắt thú bật / tắt theo từng khung (nhớ lại sau khi tải lại khung, giống Tự bán)
+  function setPet(i, on) {
+    state.slots[i].pet = !!on;
+    save();
+    refresh(i);
+    if (state.slots[i].on) sendPet(i, on);
+    if (typeof renderPetBtn === "function") renderPetBtn();
+  }
 
   // Nhiệm Vụ / Phó Bản (kể cả Chạy tất cả) cần khung đủ rộng để game vẽ khung "Theo Dấu": bố cục 1 hàng làm khung
   // quá hẹp nên tự chuyển về lưới. Chỉ đổi từ 1 hàng sang lưới, không đụng tới khung đang phóng to.
@@ -181,6 +190,7 @@
 
   function setDesired(i, mode) {
     state.slots[i].desired = mode;
+    if (mode !== "farm") state.slots[i].pet = false; // chọn chế độ khác thì dừng Bắt thú (agent cũng tự dừng)
     save();
     refresh(i);
     if (state.slots[i].on) {
@@ -204,6 +214,8 @@
     const c = els[i];
     const d = state.slots[i].desired;
     c.mbtns.forEach((b) => b.classList.toggle("on", b.dataset.m === d));
+    const pb = c.slot.querySelector("[data-pet]");
+    if (pb) pb.classList.toggle("on", !!state.slots[i].pet);
     const l = live[i];
     const ttl = slotTitle(i);
     if (c.title.textContent !== ttl) c.title.textContent = ttl;
@@ -256,6 +268,7 @@
       const d = state.slots[i].desired;
       if (d) { ensureGrid(d); send(i, d, true); }
       if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
+      if (state.slots[i].pet) sendPet(i, true); // và Bắt thú nếu khung này đang bật
     } else if (m.type === "events") {
       logEvents(i, m.lines);
     } else if (m.type === "status") {
@@ -295,12 +308,12 @@
       MODES.map((m) => '<button class="sm" data-m="' + m[0] + '" title="' + m[2] + '" aria-label="' + m[2] + '">' + m[1] + '</button>').join("") +
       '<button class="sm" data-m="combo" title="Chạy tất cả: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công" aria-label="Chạy tất cả">▶</button>' +
       '<button class="sm" data-boss title="Boss tuần: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng)" aria-label="Boss tuần">👹</button>' +
-      '<button class="sm" data-pet title="Bắt thú: đi tìm những loài thú chưa có trong Thú điển (đứng ở bãi có loài còn thiếu và luyện công; bấm lần nữa để dừng)" aria-label="Bắt thú">🐾</button>' +
+      '<button class="sm" data-pet title="Bắt thú: bật / tắt đi tìm những loài thú chưa có trong Thú điển (đứng ở bãi có loài còn thiếu và luyện công)" aria-label="Bắt thú">🐾</button>' +
       '<button class="sm" data-sell title="Bán đồ xanh trong hành trang (đồ khóa, đồ đang mặc, đồ bạn đặt giữ được giữ lại)" aria-label="Bán đồ xanh">💰</button>' +
-      '<button class="sm" data-pdd title="Đóng bình: đóng hết Phúc Duyên chờ đóng thành bình Đại / Trung / Tiểu" aria-label="Đóng bình">🎐</button>' +
-      '<button class="sm" data-pdu title="Dùng bình: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
+      '<button class="sm" data-pdd title="Đóng bình PD: đóng hết Phúc Duyên chờ đóng thành bình Đại / Trung / Tiểu" aria-label="Đóng bình">🎐</button>' +
+      '<button class="sm" data-pdu title="Dùng bình PD: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
       '<button class="sm" data-pdh title="Mở hồng bao: mở hết Hồng Bao và Đại Hồng Bao đang có (lượng / Kim Nguyên Bảo ngẫu nhiên)" aria-label="Mở hồng bao">🧧</button>' +
-      '<button class="sm" data-pdo title="Mở hết: mở hết rương Phúc Duyên trong Phần thưởng (mỗi rương 10 điểm)" aria-label="Mở hết rương Phúc Duyên">🎁</button>' +
+      '<button class="sm" data-pdo title="Mở hết PD: mở hết rương Phúc Duyên trong Phần thưởng (mỗi rương 10 điểm)" aria-label="Mở hết rương Phúc Duyên">🎁</button>' +
       '<span class="st"></span></div>' +
       '<div class="frame"></div>';
     main.appendChild(slot);
@@ -311,7 +324,7 @@
     const idx = () => els.indexOf(c);
     c.mbtns.forEach((b) => (b.onclick = () => setDesired(idx(), b.dataset.m)));
     slot.querySelector("[data-boss]").onclick = () => sendBoss(idx());
-    slot.querySelector("[data-pet]").onclick = () => sendPet(idx());
+    slot.querySelector("[data-pet]").onclick = () => setPet(idx(), !state.slots[idx()].pet);
     slot.querySelector("[data-sell]").onclick = () => sendSell(idx());
     slot.querySelector("[data-pdd]").onclick = () => sendPd(idx(), "dong");
     slot.querySelector("[data-pdu]").onclick = () => sendPd(idx(), "dung");
@@ -382,6 +395,11 @@
   // ----- Nút điều khiển cho tất cả khung -----
   const allBox = document.getElementById("allModes");
   const forOn = (fn) => state.slots.forEach((s, i) => s.on && fn(i));
+  const comboBtn = document.createElement("button");
+  comboBtn.textContent = "▶ Chạy PB + NV";
+  comboBtn.title = "Tất cả nhân vật: làm hết Phó Bản (PB), rồi Nhiệm Vụ (NV), xong về Luyện Công";
+  comboBtn.onclick = () => forOn((i) => setDesired(i, "combo"));
+  allBox.appendChild(comboBtn);
   MODES.forEach((m) => {
     const b = document.createElement("button");
     b.textContent = m[1] + " " + m[2];
@@ -395,9 +413,18 @@
   bossBtn.onclick = () => forOn(sendBoss);
   allBox.appendChild(bossBtn);
   const petBtn = document.createElement("button");
-  petBtn.textContent = "🐾 Bắt thú";
-  petBtn.title = "Tất cả nhân vật: đi tìm những loài thú chưa có trong Thú điển (bấm lần nữa để dừng)";
-  petBtn.onclick = () => forOn(sendPet);
+  const renderPetBtn = () => {
+    const on = state.slots.some((s) => s.on && s.pet);
+    petBtn.textContent = "🐾 Bắt thú: " + (on ? "BẬT" : "TẮT");
+    petBtn.classList.toggle("on", on);
+  };
+  petBtn.title = "Bật / tắt cho tất cả nhân vật: đi tìm những loài thú chưa có trong Thú điển. Bật thì các khung đang bật cùng chạy, tắt thì dừng hết.";
+  petBtn.onclick = () => {
+    const on = !state.slots.some((s) => s.on && s.pet);
+    forOn((i) => setPet(i, on));
+    renderPetBtn();
+  };
+  renderPetBtn();
   allBox.appendChild(petBtn);
   const sellBtn = document.createElement("button");
   sellBtn.textContent = "💰 Bán xanh";
@@ -438,7 +465,7 @@
   keptLbl.appendChild(document.createTextNode("gồm đồ giữ"));
   allBox.appendChild(keptLbl);
   const dongBtn = document.createElement("button");
-  dongBtn.textContent = "🎐 Đóng bình";
+  dongBtn.textContent = "🎐 Đóng bình PD";
   dongBtn.title = "Tất cả nhân vật: đóng hết Phúc Duyên chờ đóng bình thành bình Đại / Trung / Tiểu";
   dongBtn.onclick = () => forOn((i) => sendPd(i, "dong"));
   allBox.appendChild(dongBtn);
@@ -453,18 +480,13 @@
     };
     allBox.appendChild(b);
   };
-  pdAll("🧪 Dùng bình", "Tất cả nhân vật: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang", "dung", "Dùng HẾT bình Phúc Duyên Lộ trong hành trang");
-  pdAll("🎁 Mở hết", "Tất cả nhân vật: mở hết rương Phúc Duyên trong Phần thưởng", "mo", "Mở HẾT rương Phúc Duyên trong Phần thưởng");
+  pdAll("🧪 Dùng bình PD", "Tất cả nhân vật: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang", "dung", "Dùng HẾT bình Phúc Duyên Lộ trong hành trang");
+  pdAll("🎁 Mở hết PD", "Tất cả nhân vật: mở hết rương Phúc Duyên trong Phần thưởng", "mo", "Mở HẾT rương Phúc Duyên trong Phần thưởng");
   const hbBtn = document.createElement("button");
   hbBtn.textContent = "🧧 Mở hồng bao";
   hbBtn.title = "Tất cả nhân vật: mở hết Hồng Bao và Đại Hồng Bao đang có";
   hbBtn.onclick = () => forOn((i) => sendPd(i, "hb"));
   allBox.appendChild(hbBtn);
-  const comboBtn = document.createElement("button");
-  comboBtn.textContent = "▶ Chạy hết";
-  comboBtn.title = "Tất cả nhân vật: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công";
-  comboBtn.onclick = () => forOn((i) => setDesired(i, "combo"));
-  allBox.appendChild(comboBtn);
 
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
@@ -713,8 +735,10 @@
     const t1 = el("table", "", "", box);
     const r0 = el("tr", "", "", t1);
     ["Nhân vật", "Cấp", "Cấp tăng", "Lượng kiếm", "Lượng chi", "KNB kiếm", "KNB chi", "Tầng tháp", "Tầng cao nhất"].forEach((h) => el("th", "", h, r0));
+    const tot = { up: 0, earned: 0, spent: 0, knbIn: 0, knbOut: 0, tw: 0 };
     chars.forEach((n) => {
       const c = logData[n], d = c.days[today];
+      if (d) Object.keys(tot).forEach((k) => { tot[k] += d[k] | 0; });
       const r = el("tr", "", "", t1);
       el("td", "", n, r);
       el("td", "", c.lv || "-", r);
@@ -727,6 +751,18 @@
       el("td", d.tw ? "pos" : "dim", d.tw ? "+" + d.tw : "0", r);
       el("td", d.twMax ? "" : "dim", d.twMax ? String(d.twMax) : "-", r);
     });
+    if (chars.length > 1) { // hàng tổng: số tiền (ngân lượng) và các số khác của tất cả nhân vật trong ngày
+      const r = el("tr", "tot", "", t1);
+      el("td", "", "Tổng (" + chars.length + " nhân vật)", r);
+      el("td", "dim", "-", r);
+      el("td", tot.up ? "pos" : "dim", tot.up ? "+" + tot.up : "0", r);
+      el("td", tot.earned ? "pos" : "dim", fmtGold(tot.earned), r);
+      el("td", tot.spent ? "neg" : "dim", fmtGold(tot.spent), r);
+      el("td", tot.knbIn ? "pos" : "dim", fmtNum(tot.knbIn), r);
+      el("td", tot.knbOut ? "neg" : "dim", fmtNum(tot.knbOut), r);
+      el("td", tot.tw ? "pos" : "dim", tot.tw ? "+" + tot.tw : "0", r);
+      el("td", "dim", "-", r);
+    }
 
     if (logSel) {
       const c = logData[logSel];
