@@ -479,6 +479,34 @@
   // tính số KNB đổi được từ ngân lượng trong bản lưu (trừ phần giữ lại) rồi bấm [×100] / [×10] / [Mua] cho tới khi đủ.
   // Nút nào bị khóa (hết giới hạn ngày) thì hạ xuống cỡ nhỏ hơn. Bản lưu có thể cũ tới ~10 giây (ngân lượng mới kiếm chưa tính)
   // nên chỉ có thể đổi ít hơn một chút chứ không đổi quá.
+  // Mở Kỳ Trân Các và tìm một phần tử trong cửa sổ. Bản game có hai bảng ("🔒 Bảng KNB khóa" mặc định, "💰 Bảng Kim Nguyên Bảo")
+  // và các thẻ danh mục theo bảng: tìm ngay, chưa thấy thì bấm sang bảng Kim Nguyên Bảo, rồi bấm thẻ có chữ khớp tabRe
+  // (bản cũ chỉ có thẻ danh mục). Trả về { el } hoặc { err }; lỗi kèm tên các nút đang hiện để dễ chẩn đoán.
+  async function openKtc(findEl, tabRe) {
+    const open = q("#u20ktc") || q("#ktcBtn");
+    if (!open) return { err: "không thấy nút Kỳ Trân Các" };
+    open.click();
+    let el = await waitFor(findEl, 3000);
+    if (!el) {
+      const board = q('#mBody [data-kb="1"]');
+      if (board) {
+        board.click();
+        el = await waitFor(findEl, 3000);
+      }
+    }
+    if (!el) {
+      const tabs = qa("#mBody [data-kc]");
+      const tab = tabs.find((b) => tabRe.test(b.textContent)) || tabs[0];
+      if (tab) {
+        tab.click();
+        el = await waitFor(findEl, 3000);
+      }
+    }
+    if (el) return { el };
+    const seen = qa("#mBody [data-kb], #mBody [data-kc]").map((b) => b.textContent.trim()).join(" | ");
+    closeModalBtn();
+    return { err: "không thấy mục cần tìm trong Kỳ Trân Các" + (seen ? " (đang hiện: " + seen + ")" : " (cửa sổ không mở)") };
+  }
   const KNB_GOLD = 1e5; // ngân lượng cho 1 KNB
   async function pdDoi(m) {
     if (!q("#mswMenu")) return "Chưa vào game";
@@ -488,35 +516,10 @@
     if (!sv) return "chưa đọc được số ngân lượng (nhân vật chưa nạp?)";
     let remain = Math.floor((sv.gold - keep) / KNB_GOLD);
     if (remain <= 0) return "không có gì để đổi (đang có " + fmtGold(sv.gold) + " lượng, giữ lại " + fmtGold(keep) + ")";
-    const open = q("#u20ktc") || q("#ktcBtn");
-    if (!open) return "không thấy nút Kỳ Trân Các";
     petUi = true;
     try {
-      open.click();
-      const findCard = () => q('#mBody [data-ktc="knb"]');
-      let card = await waitFor(findCard, 3000);
-      if (!card) {
-        // Bản game có hai bảng: KNB (đổi từ lượng) nằm ở "💰 Bảng Kim Nguyên Bảo", bảng mặc định là "🔒 Bảng KNB khóa"
-        const board = q('#mBody [data-kb="1"]');
-        if (board) {
-          board.click();
-          card = await waitFor(findCard, 3000);
-        }
-      }
-      if (!card) {
-        // Bản cũ chỉ có thẻ danh mục: bấm thẻ "Đổi KNB" (hoặc thẻ đầu)
-        const tabs = qa("#mBody [data-kc]");
-        const tab = tabs.find((b) => /Đổi KNB/.test(b.textContent)) || tabs[0];
-        if (tab) {
-          tab.click();
-          card = await waitFor(findCard, 3000);
-        }
-      }
-      if (!card) {
-        const seen = qa("#mBody [data-kb], #mBody [data-kc]").map((b) => b.textContent.trim()).join(" | ");
-        closeModalBtn();
-        return "không thấy mục đổi KNB trong Kỳ Trân Các" + (seen ? " (đang hiện: " + seen + ")" : " (cửa sổ không mở)");
-      }
+      const found = await openKtc(() => q('#mBody [data-ktc="knb"]'), /Đổi KNB/);
+      if (found.err) return found.err;
       const before = sv.knb;
       let bought = 0;
       let maxStep = 100;
@@ -687,8 +690,65 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk };
+  // Mở hết Rương Ngựa: Kỳ Trân Các > thẻ "Thú cưỡi" > [Dùng] (mỗi lần bấm mở 1 rương, ngựa vào hành trang; Quý trở lên tự khóa).
+  // Số rương lấy từ gợi ý của nút ("Dùng 1 (đang có N)"). Sau mỗi lần bấm chờ số rương còn lại giảm; game báo lỗi (ví dụ
+  // "Hành trang đầy") thì dừng và ghi lý do. Tên ngựa nhận được lấy từ thông báo nổi của game.
+  async function pdRngua() {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    petUi = true;
+    try {
+      const found = await openKtc(() => q('#mBody [data-ktcuse="rngua"]'), /Thú cưỡi/);
+      if (found.err) return found.err;
+      const btnNow = () => q('#mBody [data-ktcuse="rngua"]');
+      const count = () => {
+        const b = btnNow();
+        const m = b && String(b.title || "").match(/đang có\s*(\d+)/);
+        return b ? (m ? +m[1] : 0) : -1; // -1 = không còn nút (cửa sổ đổi)
+      };
+      const total = count();
+      if (!(total > 0)) {
+        closeModalBtn();
+        return "không có Rương Ngựa nào";
+      }
+      let opened = 0;
+      let stop = "";
+      const horses = [];
+      for (let guard = 0; guard < 400 && !stop; guard++) {
+        const btn = btnNow();
+        if (!btn) {
+          stop = "mất nút Dùng";
+          break;
+        }
+        if (btn.disabled) break; // hết rương
+        const before = count();
+        await waitFor(() => !toastOn(), 2500);
+        btn.click();
+        let toast = "";
+        const done = await waitFor(() => {
+          toast = toastOn() || toast;
+          const b = btnNow();
+          return !b || b.disabled || count() < before;
+        }, 15000);
+        if (!done) {
+          stop = toast || "game không phản hồi";
+          break;
+        }
+        opened++;
+        if (toast) horses.push(toast.replace(/^Rương Ngựa\s*(\(\d+\))?\s*:?\s*/, ""));
+        await wait(150);
+      }
+      closeModalBtn();
+      if (!opened) return stop ? "không mở được: " + stop : "không có Rương Ngựa nào";
+      const shown = horses.slice(0, 5).join(", ") + (horses.length > 5 ? " +" + (horses.length - 5) : "");
+      return "đã mở " + opened + " Rương Ngựa" + (shown ? " · " + shown : "") + (stop ? " · dừng: " + stop : "");
+    } finally {
+      petUi = false;
+    }
+  }
+
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
