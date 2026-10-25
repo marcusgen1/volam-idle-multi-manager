@@ -690,55 +690,140 @@
     }
   }
 
-  // Mở hết Rương Ngựa: Kỳ Trân Các > thẻ "Thú cưỡi" > [Dùng] (mỗi lần bấm mở 1 rương, ngựa vào hành trang; Quý trở lên tự khóa).
-  // Số rương lấy từ gợi ý của nút ("Dùng 1 (đang có N)"). Sau mỗi lần bấm chờ số rương còn lại giảm; game báo lỗi (ví dụ
-  // "Hành trang đầy") thì dừng và ghi lý do. Tên ngựa nhận được lấy từ thông báo nổi của game.
+  // Mở hết Rương Ngựa. Có hai nơi chứa rương:
+  //  1) "Túi vật phẩm" trong thẻ Hành trang: ô Rương Ngựa (data-mi="rngua") mở cửa sổ có [Dùng] và [Dùng ×N] (N = tối đa 10, mở một lần N rương).
+  //     Bấm [Dùng ×N] lặp lại tới hết; còn đúng 1 rương thì chỉ có [Dùng]. Sau khi bấm game đóng cửa sổ và vẽ lại ô nên mở lại ô để đọc số mới.
+  //  2) Rương nằm thành chồng trong lưới hành trang (mua ở Kỳ Trân Các): chỉ mở được từng cái bằng [Dùng] ở Kỳ Trân Các > "Thú cưỡi"
+  //     (game không vẽ lại cửa sổ sau khi bấm nên chờ thông báo rồi bấm thẻ danh mục để vẽ lại và đọc số còn lại).
+  // Mỗi lần bấm chờ thông báo nổi của game (tên ngựa / "Mở N Rương Ngựa", hoặc lỗi như "Hành trang đầy" thì dừng).
+  const TOAST_ERR = /^(Hành trang đầy|Túi đầy|Không có|Không đủ|Cần |Tối đa|Đang )|lỗi/i;
+  const rnguaToast = (toast, horses) => {
+    const many = toast.match(/Mở\s+(\d+)\s+Rương/); // "Mở N Rương Ngựa" khi mở nhiều cùng lúc
+    if (!many) horses.push(toast.replace(/^Rương Ngựa\s*(\(\d+\))?\s*:?\s*/, ""));
+    return many ? +many[1] : 1;
+  };
+  async function rnguaViaBag() {
+    const res = { opened: 0, horses: [], stop: "", found: false };
+    const invTab = q('#tabs button[data-t="inv"]');
+    if (!invTab) return res;
+    const prev = activeTab();
+    if (prev !== "inv") invTab.click();
+    try {
+      await wait(250);
+      const tileCount = () => digits((q('[data-mi="rngua"] i') || {}).textContent);
+      let stuck = 0;
+      for (let guard = 0; guard < 200 && !res.stop; guard++) {
+        const tile = q('[data-mi="rngua"]');
+        if (!tile) break;
+        res.found = true;
+        const before = tileCount();
+        tile.click();
+        const btn = await waitFor(() => q("#miUse10") || q("#miUse"), 3000);
+        if (!btn) {
+          res.stop = "không mở được cửa sổ Rương Ngựa";
+          break;
+        }
+        if (btn.disabled) {
+          closeModalBtn();
+          break;
+        }
+        await waitFor(() => !toastOn(), 2500); // chờ thông báo cũ tắt để không đọc nhầm
+        btn.click();
+        const toast = await waitFor(() => toastOn(), 15000);
+        if (!toast) {
+          closeModalBtn();
+          res.stop = "game không phản hồi";
+          break;
+        }
+        if (TOAST_ERR.test(toast)) {
+          closeModalBtn();
+          res.stop = toast;
+          break;
+        }
+        res.opened += rnguaToast(toast, res.horses);
+        await waitFor(() => !toastOn(), 2500);
+        closeModalBtn();
+        await wait(300);
+        const after = q('[data-mi="rngua"]') ? tileCount() : 0;
+        if (after >= before && before > 0) {
+          if (++stuck >= 2) res.stop = "số Rương Ngựa không giảm sau khi mở";
+        } else stuck = 0;
+      }
+    } finally {
+      closeModalBtn();
+      restoreTab(prev);
+    }
+    return res;
+  }
+  async function rnguaViaKtc() {
+    const res = { opened: 0, horses: [], stop: "", found: false };
+    const found = await openKtc(() => q('#mBody [data-ktcuse="rngua"]'), /Thú cưỡi/);
+    if (found.err) {
+      res.stop = found.err;
+      return res;
+    }
+    const btnNow = () => q('#mBody [data-ktcuse="rngua"]');
+    const count = () => {
+      const b = btnNow();
+      const m = b && String(b.title || "").match(/đang có\s*(\d+)/);
+      return b ? (m ? +m[1] : 0) : -1; // -1 = không còn nút (cửa sổ đổi)
+    };
+    // Vẽ lại cửa sổ Kỳ Trân Các: bấm thẻ danh mục đang chọn (game vẽ lại cả cửa sổ rồi mới có số rương mới)
+    const refresh = async () => {
+      const cur = q("#mBody [data-kc].on") || q("#mBody [data-kc]");
+      if (cur) cur.click();
+      await wait(250);
+    };
+    if (!(count() > 0)) {
+      closeModalBtn();
+      return res;
+    }
+    res.found = true;
+    let stuck = 0;
+    for (let guard = 0; guard < 400 && !res.stop; guard++) {
+      const btn = btnNow();
+      if (!btn) {
+        res.stop = "mất nút Dùng";
+        break;
+      }
+      if (btn.disabled) break; // hết rương
+      const before = count();
+      await waitFor(() => !toastOn(), 2500);
+      btn.click();
+      const toast = await waitFor(() => toastOn(), 15000);
+      if (!toast) {
+        res.stop = "game không phản hồi";
+        break;
+      }
+      if (TOAST_ERR.test(toast)) {
+        res.stop = toast;
+        break;
+      }
+      res.opened += rnguaToast(toast, res.horses);
+      await waitFor(() => !toastOn(), 2500);
+      await refresh();
+      const after = count();
+      if (after >= 0 && after >= before) {
+        // số rương không giảm dù đã báo mở: thử vẽ lại thêm một lần, vẫn vậy thì dừng để khỏi lặp vô hạn
+        await wait(600);
+        await refresh();
+        if (count() >= before && ++stuck >= 2) res.stop = "số Rương Ngựa không giảm sau khi mở";
+      } else stuck = 0;
+    }
+    closeModalBtn();
+    return res;
+  }
   async function pdRngua() {
     if (!q("#mswMenu")) return "Chưa vào game";
     if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
     petUi = true;
     try {
-      const found = await openKtc(() => q('#mBody [data-ktcuse="rngua"]'), /Thú cưỡi/);
-      if (found.err) return found.err;
-      const btnNow = () => q('#mBody [data-ktcuse="rngua"]');
-      const count = () => {
-        const b = btnNow();
-        const m = b && String(b.title || "").match(/đang có\s*(\d+)/);
-        return b ? (m ? +m[1] : 0) : -1; // -1 = không còn nút (cửa sổ đổi)
-      };
-      const total = count();
-      if (!(total > 0)) {
-        closeModalBtn();
-        return "không có Rương Ngựa nào";
-      }
-      let opened = 0;
-      let stop = "";
-      const horses = [];
-      for (let guard = 0; guard < 400 && !stop; guard++) {
-        const btn = btnNow();
-        if (!btn) {
-          stop = "mất nút Dùng";
-          break;
-        }
-        if (btn.disabled) break; // hết rương
-        const before = count();
-        await waitFor(() => !toastOn(), 2500);
-        btn.click();
-        let toast = "";
-        const done = await waitFor(() => {
-          toast = toastOn() || toast;
-          const b = btnNow();
-          return !b || b.disabled || count() < before;
-        }, 15000);
-        if (!done) {
-          stop = toast || "game không phản hồi";
-          break;
-        }
-        opened++;
-        if (toast) horses.push(toast.replace(/^Rương Ngựa\s*(\(\d+\))?\s*:?\s*/, ""));
-        await wait(150);
-      }
-      closeModalBtn();
+      const bag = await rnguaViaBag();
+      let ktc = { opened: 0, horses: [], stop: "", found: false };
+      if (!bag.stop) ktc = await rnguaViaKtc(); // rương còn lại ở dạng chồng trong lưới hành trang
+      const opened = bag.opened + ktc.opened;
+      const horses = bag.horses.concat(ktc.horses);
+      const stop = bag.stop || (ktc.found || ktc.opened ? ktc.stop : "");
       if (!opened) return stop ? "không mở được: " + stop : "không có Rương Ngựa nào";
       const shown = horses.slice(0, 5).join(", ") + (horses.length > 5 ? " +" + (horses.length - 5) : "");
       return "đã mở " + opened + " Rương Ngựa" + (shown ? " · " + shown : "") + (stop ? " · dừng: " + stop : "");
