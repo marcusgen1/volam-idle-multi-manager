@@ -612,8 +612,83 @@
       petUi = false;
     }
   }
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb };
+  // Mở Hộp thư và chờ màn Gửi thư (dùng chung cho gửi KNB / gửi đồ). Trả về "" nếu mở được, ngược lại là lý do.
+  async function openMailForm() {
+    const btn = q("#u20mail");
+    if (btn) btn.click();
+    else window.dispatchEvent(new KeyboardEvent("keydown", { key: "F6", bubbles: true })); // phím tắt mở Hộp thư
+    if (await waitFor(() => q("#nmTo") && q("#nmGold"), 8000)) return "";
+    closeModalBtn();
+    return toastText() || "không mở được Hộp thư (cần đăng nhập máy chủ)";
+  }
+  const setField = (sel, v) => {
+    const el = q(sel);
+    el.value = v;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  // Gửi đồ Hoàng Kim: chọn các món Hoàng Kim trong hành trang ("Kèm món đồ" của màn Gửi thư: ô có lớp r4; bỏ ô khóa 🔒 / đang giữ
+  // cho Dã Tẩu 📜), mỗi thư tối đa 10 món (giới hạn của game), bấm [Gửi thư] rồi [Gửi] ở hộp xác nhận; lặp tới khi hết.
+  // Đồ Bạch Kim (r5) và đồ đang mặc không gửi. Dừng khi game báo lỗi.
+  const MAIL_ITEMS_MAX = 10;
+  async function pdGuiHk(m) {
+    const to = String(m.to || "").trim();
+    if (!to) return "chưa nhập tên nhân vật nhận";
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    petUi = true;
+    try {
+      const err = await openMailForm();
+      if (err) return err;
+      const hk = () => qa("#nmInv [data-uid].r4").filter((el) => !el.querySelector("u.lk"));
+      let sent = 0;
+      let mails = 0;
+      let stop = "";
+      for (let guard = 0; guard < 40 && !stop; guard++) {
+        const tiles = hk();
+        if (!tiles.length) break;
+        qa("#nmInv .ep-on").forEach((el) => el.click()); // bỏ chọn món còn nhớ từ lần trước
+        const pick = tiles.slice(0, MAIL_ITEMS_MAX);
+        pick.forEach((el) => el.click());
+        if (qa("#nmInv .ep-on").length !== pick.length) {
+          stop = "không chọn được các món đồ";
+          break;
+        }
+        const gd = q("#nmGdOn");
+        if (gd && gd.checked) gd.click();
+        setField("#nmTo", to);
+        setField("#nmGold", "");
+        setField("#nmNote", "");
+        await waitFor(() => !toastOn(), 2500);
+        const oldInv = q("#nmInv");
+        q("#nmSend").click();
+        const ask = await waitFor(() => q('#askBox [data-a="1"]'), 3000);
+        if (!ask) {
+          stop = toastText() || "không hiện hộp xác nhận gửi";
+          break;
+        }
+        ask.click();
+        const res = await waitFor(() => toastOn(), 10000);
+        if (res && /Đã gửi/.test(res)) {
+          sent += pick.length;
+          mails++;
+          // Game vẽ lại cả màn Gửi thư sau khi gửi (sau khi tải lại Hộp thư): chờ ô "Kèm món đồ" mới thay ô cũ, không thao tác trên bản cũ
+          if (!(await waitFor(() => { const cur = q("#nmInv"); return cur && cur !== oldInv; }, 15000))) {
+            stop = "màn Gửi thư không hiện lại";
+          }
+        } else {
+          stop = res || "không rõ kết quả";
+        }
+      }
+      closeModalBtn();
+      if (!sent) return stop ? "không gửi được: " + stop : "không có đồ Hoàng Kim nào để gửi (đồ khóa, đang mặc và Bạch Kim không tính)";
+      return "đã gửi " + sent + " món Hoàng Kim cho " + to + " (" + mails + " thư)" + (stop ? " · dừng: " + stop : "");
+    } finally {
+      petUi = false;
+    }
+  }
+
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
