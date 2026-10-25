@@ -287,6 +287,11 @@
     const el = q("#toast");
     return el ? el.textContent.trim() : "";
   };
+  // Thông báo nổi của game đang hiện (có lớp "on" khoảng 2 giây) -> nội dung, "" nếu không có
+  const toastOn = () => {
+    const el = q("#toast");
+    return el && el.classList.contains("on") ? el.textContent.trim() : "";
+  };
   const digits = (s) => +String(s || "").replace(/\D/g, "") || 0;
   // Số bình mỗi loại (1 = Tiểu, 2 = Trung, 3 = Đại): lấy từ nút "Dùng hết" (nút cuối của hàng, data-n là số bình thật).
   // Nút "Dùng 1" đứng trước luôn có data-n = 1 nên không dùng nó.
@@ -470,18 +475,141 @@
     if (!parts.length) return stop || "không có Hồng Bao nào";
     return "đã mở " + parts.join(" + ") + gain + (stop ? " · dừng: " + stop : "");
   }
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb };
-  async function runPd(kind) {
+  // Đổi ngân lượng thành KNB ở Kỳ Trân Các (thẻ đầu, thẻ "Kim Nguyên Bảo": 1 KNB = 10 vạn lượng, tối đa 10.000 KNB mỗi ngày):
+  // tính số KNB đổi được từ ngân lượng trong bản lưu (trừ phần giữ lại) rồi bấm [×100] / [×10] / [Mua] cho tới khi đủ.
+  // Nút nào bị khóa (hết giới hạn ngày) thì hạ xuống cỡ nhỏ hơn. Bản lưu có thể cũ tới ~10 giây (ngân lượng mới kiếm chưa tính)
+  // nên chỉ có thể đổi ít hơn một chút chứ không đổi quá.
+  const KNB_GOLD = 1e5; // ngân lượng cho 1 KNB
+  async function pdDoi(m) {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    const keep = Math.max(0, Math.floor(+m.keep || 0)) * 1e4; // nhập theo vạn lượng
+    const sv = readSave(true);
+    if (!sv) return "chưa đọc được số ngân lượng (nhân vật chưa nạp?)";
+    let remain = Math.floor((sv.gold - keep) / KNB_GOLD);
+    if (remain <= 0) return "không có gì để đổi (đang có " + fmtGold(sv.gold) + " lượng, giữ lại " + fmtGold(keep) + ")";
+    const open = q("#u20ktc") || q("#ktcBtn");
+    if (!open) return "không thấy nút Kỳ Trân Các";
+    petUi = true;
+    try {
+      open.click();
+      let card = await waitFor(() => q('#mBody [data-ktc="knb"]'), 4000);
+      if (!card) {
+        const tab = q('#mBody [data-kc="0"]');
+        if (tab) tab.click();
+        card = await waitFor(() => q('#mBody [data-ktc="knb"]'), 4000);
+      }
+      if (!card) {
+        closeModalBtn();
+        return "không mở được Kỳ Trân Các";
+      }
+      const before = sv.knb;
+      let bought = 0;
+      let maxStep = 100;
+      let stop = "";
+      for (let guard = 0; guard < 500 && remain > 0 && !stop; guard++) {
+        const step = Math.min(maxStep, remain >= 100 ? 100 : remain >= 10 ? 10 : 1);
+        const btn = q("#mBody " + (step === 100 ? '[data-ktc100="knb"]' : step === 10 ? '[data-ktc10="knb"]' : '[data-ktc="knb"]'));
+        if (!btn) {
+          stop = "không thấy nút mua KNB";
+        } else if (btn.disabled) {
+          if (step > 1) maxStep = step === 100 ? 10 : 1; // hết giới hạn ngày / không đủ cho cỡ này: thử cỡ nhỏ hơn
+          else stop = "đã tới giới hạn đổi trong ngày (10.000 KNB) hoặc không đủ ngân lượng";
+        } else {
+          btn.click();
+          bought += step;
+          remain -= step;
+          await wait(400);
+        }
+      }
+      closeModalBtn();
+      if (!bought) return stop || "không đổi được";
+      // Bản lưu cập nhật sau tối đa ~10 giây: chờ để báo số KNB thật
+      let after = before;
+      for (let t = 0; t < 14 && after === before; t++) {
+        await wait(1000);
+        const s2 = readSave(true);
+        if (s2) after = s2.knb;
+      }
+      return "đã mua " + bought + " KNB" + (after !== before ? " (KNB " + before + " → " + after + ")" : " (chưa thấy bản lưu cập nhật)") + (stop ? " · dừng: " + stop : "");
+    } finally {
+      petUi = false;
+    }
+  }
+
+  // Gửi hết KNB cho nhân vật khác bằng thư: mở Hộp thư, điền người nhận + số KNB (ô "KNB" của màn Gửi thư, chỉ có ở tài khoản online),
+  // bỏ chọn mọi món đồ và ô thư giao dịch, bấm [Gửi thư]. Số KNB lấy từ bản lưu; nếu chưa khớp với số hiện trên màn hình
+  // (bản lưu cũ tới ~10 giây, ví dụ vừa đổi xong) thì chờ cho khớp để không gửi thiếu.
+  const approxKnb = (t) => {
+    const m = String(t || "").match(/([\d.]+)\s*([kMB]?)/);
+    return m ? parseFloat(m[1]) * ({ k: 1e3, M: 1e6, B: 1e9 }[m[2]] || 1) : null;
+  };
+  async function pdGuiKnb(m) {
+    const to = String(m.to || "").trim();
+    if (!to) return "chưa nhập tên nhân vật nhận";
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    if (!readSave(true)) return "chưa đọc được số KNB (nhân vật chưa nạp?)";
+    petUi = true;
+    try {
+      const btn = q("#u20mail");
+      if (btn) btn.click();
+      else window.dispatchEvent(new KeyboardEvent("keydown", { key: "F6", bubbles: true })); // phím tắt mở Hộp thư
+      if (!(await waitFor(() => q("#nmTo") && q("#nmGold"), 8000))) {
+        closeModalBtn();
+        return toastText() || "không mở được Hộp thư (cần đăng nhập máy chủ)";
+      }
+      const label = q("#nmGoldL");
+      if (!label || label.textContent.trim() !== "KNB") {
+        closeModalBtn();
+        return "ô gửi thư đang là ngân lượng, không phải KNB (tài khoản chưa ở chế độ online)";
+      }
+      const shown = approxKnb((q(".ml-have b") || {}).textContent);
+      let knb = 0;
+      for (let t = 0; t < 16; t++) {
+        const sv = readSave(true);
+        knb = sv ? sv.knb : 0;
+        if (shown == null || Math.abs(knb - shown) <= Math.max(60, shown * 0.006)) break;
+        await wait(1000);
+      }
+      if (knb <= 0) {
+        closeModalBtn();
+        return "không có KNB để gửi";
+      }
+      qa("#nmInv .ep-on").forEach((el) => el.click()); // bỏ chọn món đồ còn nhớ từ lần mở trước
+      const gd = q("#nmGdOn");
+      if (gd && gd.checked) gd.click();
+      const set = (sel, v) => {
+        const el = q(sel);
+        el.value = v;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      set("#nmTo", to);
+      set("#nmGold", String(knb));
+      set("#nmNote", "");
+      await waitFor(() => !toastOn(), 2500); // chờ thông báo cũ (nếu có) tắt để không đọc nhầm
+      q("#nmSend").click();
+      await wait(300);
+      const res = await waitFor(() => toastOn(), 8000);
+      closeModalBtn();
+      if (res && /Đã gửi/.test(res)) return "đã gửi " + knb + " KNB cho " + to;
+      return res ? "không gửi được: " + res : "không rõ kết quả, kiểm tra Hộp thư trong game";
+    } finally {
+      petUi = false;
+    }
+  }
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb };
+  async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
     pdMsg = PD_NAME[kind] + ": đang chạy…";
     report(true);
     try {
-      const r = await PD_RUN[kind]();
+      const r = await PD_RUN[kind](m);
       pdMsg = PD_NAME[kind] + ": " + r;
     } catch (err) {
-      pdMsg = "Phúc Duyên: lỗi " + (err && err.message ? err.message : err);
+      pdMsg = PD_NAME[kind] + ": lỗi " + (err && err.message ? err.message : err);
     } finally {
       pdRun = false;
       report(true);
@@ -945,7 +1073,7 @@
       return;
     }
     if (m && m.vl === 1 && m.type === "pd") {
-      if (PD_RUN[m.kind]) runPd(m.kind);
+      if (PD_RUN[m.kind]) runPd(m.kind, m);
       return;
     }
     if (!m || m.vl !== 1 || m.type !== "setMode") return;
@@ -1015,9 +1143,9 @@
   let saveInfo = null;
   let saveSig = "";
   let saveAt = 0;
-  const readSave = () => {
+  const readSave = (force) => {
     const now = Date.now();
-    if (now - saveAt < SAVE_READ_MS) return saveInfo;
+    if (!force && now - saveAt < SAVE_READ_MS) return saveInfo;
     saveAt = now;
     try {
       const slot = localStorage.getItem("jxidle_slot"); // số thứ tự ô nhân vật; "menu" = đang ở màn chọn nhân vật
