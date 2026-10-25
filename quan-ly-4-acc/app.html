@@ -577,12 +577,12 @@
   allBox.appendChild(guiKnbBtn);
   const guiHkBtn = document.createElement("button");
   guiHkBtn.textContent = "📨 Gửi đồ Hoàng Kim";
-  guiHkBtn.title = "Tất cả nhân vật: gửi hết đồ Hoàng Kim trong hành trang cho nhân vật ở ô trên bằng thư (tối đa 10 món / thư; bỏ đồ khóa, đồ đang mặc và đồ Bạch Kim)";
+  guiHkBtn.title = "Tất cả nhân vật: gửi hết đồ Hoàng Kim trong hành trang cho nhân vật ở ô trên bằng thư (tối đa 10 món / thư; gồm cả món đã khóa 🔒; bỏ đồ đang mặc, đồ Bạch Kim và đồ giữ cho Dã Tẩu)";
   guiHkBtn.onclick = () => {
     const idxs = activeSlots();
     const to = String(state.knbTo || "").trim();
     if (!to) { alert("Nhập tên nhân vật nhận ở ô phía trên nút."); return; }
-    if (idxs.length && confirm("Gửi HẾT đồ Hoàng Kim trong hành trang của " + idxs.length + " khung đang bật cho nhân vật \"" + to + "\" qua thư?\n\nĐồ khóa 🔒, đồ đang mặc và đồ Bạch Kim được giữ lại. Thư đã gửi không thể thu hồi.")) {
+    if (idxs.length && confirm("Gửi HẾT đồ Hoàng Kim trong hành trang của " + idxs.length + " khung đang bật cho nhân vật \"" + to + "\" qua thư?\n\nGồm cả món đã khóa 🔒 (game cho gửi thư món khóa). Đồ đang mặc, đồ Bạch Kim và đồ giữ cho Dã Tẩu được giữ lại. Thư đã gửi không thể thu hồi.")) {
       idxs.forEach((i) => post(i, { type: "pd", kind: "hk", to }));
     }
   };

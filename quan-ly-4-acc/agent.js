@@ -636,9 +636,10 @@
     el.value = v;
     el.dispatchEvent(new Event("input", { bubbles: true }));
   };
-  // Gửi đồ Hoàng Kim: chọn các món Hoàng Kim trong hành trang ("Kèm món đồ" của màn Gửi thư: ô có lớp r4; bỏ ô khóa 🔒 / đang giữ
-  // cho Dã Tẩu 📜), mỗi thư tối đa 10 món (giới hạn của game), bấm [Gửi thư] rồi [Gửi] ở hộp xác nhận; lặp tới khi hết.
-  // Đồ Bạch Kim (r5) và đồ đang mặc không gửi. Dừng khi game báo lỗi.
+  // Gửi đồ Hoàng Kim: chọn các món Hoàng Kim trong hành trang ("Kèm món đồ" của màn Gửi thư: ô có lớp r4), mỗi thư tối đa 10 món
+  // (giới hạn của game), bấm [Gửi thư] rồi [Gửi] ở hộp xác nhận; lặp tới khi hết. Món khóa 🔒 VẪN gửi được (theo game, khóa chỉ chặn
+  // tự bán / bán Chợ, không chặn gửi thư) nên được gửi; chỉ bỏ ô 📜 (đang giữ cho Dã Tẩu), đồ Bạch Kim (r5) và đồ đang mặc
+  // (không nằm trong hành trang). Dừng khi game báo lỗi.
   const MAIL_ITEMS_MAX = 10;
   async function pdGuiHk(m) {
     const to = String(m.to || "").trim();
@@ -649,7 +650,7 @@
     try {
       const err = await openMailForm();
       if (err) return err;
-      const hk = () => qa("#nmInv [data-uid].r4").filter((el) => !el.querySelector("u.lk"));
+      const hk = () => qa("#nmInv [data-uid].r4").filter((el) => !/📜/.test((el.querySelector("u.lk") || {}).textContent || ""));
       let sent = 0;
       let mails = 0;
       let stop = "";
@@ -689,8 +690,20 @@
           stop = res || "không rõ kết quả";
         }
       }
+      // Tóm tắt độ hiếm các ô còn trong hành trang TRƯỚC khi đóng cửa sổ (đóng xong thì không còn gì để đọc)
+      const seen = {};
+      qa("#nmInv [data-uid]").forEach((el) => {
+        const m = el.className.match(/\br(\d)\b/);
+        const k = m ? "r" + m[1] : "?";
+        seen[k] = (seen[k] || 0) + 1;
+      });
       closeModalBtn();
-      if (!sent) return stop ? "không gửi được: " + stop : "không có đồ Hoàng Kim nào để gửi (đồ khóa, đang mặc và Bạch Kim không tính)";
+      if (!sent) {
+        if (stop) return "không gửi được: " + stop;
+        // Không thấy món nào: kể ra các độ hiếm đang có trong hành trang để dễ chẩn đoán
+        const list = Object.keys(seen).sort().map((k) => k + "×" + seen[k]).join(", ");
+        return "không có đồ Hoàng Kim (ô r4) nào trong hành trang để gửi (đồ đang mặc, Bạch Kim và đồ giữ cho Dã Tẩu không tính)" + (list ? " · hành trang đang có: " + list : " · hành trang trống");
+      }
       return "đã gửi " + sent + " món Hoàng Kim cho " + to + " (" + mails + " thư)" + (stop ? " · dừng: " + stop : "");
     } finally {
       petUi = false;
