@@ -132,7 +132,7 @@
     const sv = ready ? readSave() : null; // số liệu thật từ bản lưu của game (không phụ thuộc việc khung có đang được vẽ)
     const ok = ready && charLoaded(); // không có bản lưu thì đọc chữ trên thanh trên, nhưng chỉ khi đã vào nhân vật (trước đó là số mặc định: cấp 1, 0 lượng)
     if (sv && sv.name) heroName = sv.name;
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, petOn: petRun, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -638,6 +638,7 @@
     const zones = await getZones();
     if (!zones.size) return { err: "không thấy danh sách Bản đồ luyện công (thử mở thẻ Màn chơi)" };
     const score = new Map(); // tên bãi -> số loài thiếu có ở đó
+    const names = new Map(); // tên bãi -> tên các loài thiếu có ở đó (tên thật lấy từ dữ liệu game, Thú điển chỉ hiện "???")
     let reachable = 0;
     for (const idx of missing) {
       let ok = false;
@@ -647,6 +648,7 @@
         if (!z || z.locked) continue;
         ok = true;
         score.set(name, (score.get(name) || 0) + 1);
+        (names.get(name) || names.set(name, []).get(name)).push(String(pets[idx][1] || "?"));
       }
       if (ok) reachable++;
     }
@@ -656,7 +658,7 @@
       const here = zoneHere(zones.get(name), name);
       if (!best || n > best.n || (n === best.n && here)) best = { name, n, here };
     }
-    return { name: best.name, n: best.n, reachable, left: missing.length - reachable };
+    return { name: best.name, n: best.n, names: names.get(best.name) || [], reachable, left: missing.length - reachable };
   }
   async function runPet() {
     if (petRun) {
@@ -695,7 +697,8 @@
           petMsg = "Bắt thú: không chuyển được tới bãi " + plan.name;
           break;
         }
-        const info = "đã có " + dex.got + "/" + dex.total + " · " + plan.name + " (" + plan.n + " loài thiếu)" + (plan.left ? " · " + plan.left + " loài ở bãi chưa mở" : "");
+        const shown = plan.names.slice(0, 5).join(", ") + (plan.names.length > 5 ? " +" + (plan.names.length - 5) : "");
+        const info = "đã có " + dex.got + "/" + dex.total + " · " + plan.name + ": thiếu " + shown + (plan.left ? " · " + plan.left + " loài ở bãi chưa mở" : "");
         petMsg = "Bắt thú: " + info;
         report(true);
         const base = countLog(PET_LOG_MARK);
@@ -918,7 +921,10 @@
       return;
     }
     if (m && m.vl === 1 && m.type === "pet") {
-      runPet();
+      // on: true = bật (đang chạy thì thôi), false = tắt, không có = đảo trạng thái
+      if (m.on === false) petCancel = petRun;
+      else if (m.on === true) petRun || runPet();
+      else runPet();
       return;
     }
     if (m && m.vl === 1 && m.type === "sell") {
