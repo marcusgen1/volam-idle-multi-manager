@@ -33,6 +33,7 @@
 
   let desired = null; // chế độ muốn giữ, null = không điều khiển
   let queue = []; // các việc còn lại của "Chạy tất cả" (sau việc đang làm)
+  let comboAfter = "farm"; // chế độ sau khi "Chạy PB + NV" xong hết: "farm" (Luyện Công) hoặc "tower" (Leo Tháp)
   let note = ""; // lý do lần tự chuyển gần nhất (báo cho trang quản lý)
   let applied = true; // đã bấm chuyển sang desired chưa
   let tries = 0;
@@ -104,10 +105,13 @@
       report(true, true);
       return;
     }
-    console.log("[VL] Hết " + label + " (" + why + ") -> về Luyện Công");
-    desired = "farm";
+    const next = comboAfter === "tower" ? "tower" : "farm";
+    console.log("[VL] Hết " + label + " (" + why + ") -> " + (next === "tower" ? "Leo Tháp" : "về Luyện Công"));
+    desired = next;
+    farmSince = 0;
+    tries = 0;
     resetWork();
-    clickMode("farm");
+    clickMode(next);
     report(true, true);
   };
   const curMode = () => {
@@ -949,6 +953,7 @@
     if (petRun && !m.restore && m.mode !== "farm") petCancel = true; // bạn chọn chế độ khác: dừng đi bắt thú
     queue = [];
     note = "";
+    comboAfter = m.mode === "combo" && m.after === "tower" ? "tower" : "farm";
     if (m.mode === "combo") {
       queue = COMBO.slice(1);
       desired = COMBO[0];

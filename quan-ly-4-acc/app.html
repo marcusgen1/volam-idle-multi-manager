@@ -15,6 +15,7 @@
   #side h1 { font-size: 13px; margin: 0 0 4px; color: var(--accent); font-weight: 600; }
   #side button { width: 100%; padding: 2px 8px; font-size: 12px; line-height: 1.5; text-align: left; }
   #side label { font-size: 12px; }
+  #side select { width: 100%; padding: 2px 4px; font-size: 12px; background: #1d2a25; color: var(--text); border: 1px solid var(--line); border-radius: 4px; }
   .grp { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
   .grp > span { color: var(--dim); font-size: 11px; margin-top: 2px; }
   .sep { height: 1px; background: var(--line); margin: 4px 0; flex: none; }
@@ -161,7 +162,7 @@
     if (!f || !f.contentWindow) return;
     try { f.contentWindow.postMessage(Object.assign({ vl: 1 }, msg), frameOrigin(i)); } catch (e) {}
   }
-  const send = (i, mode, restore) => post(i, { type: "setMode", mode, restore: !!restore });
+  const send = (i, mode, restore) => post(i, { type: "setMode", mode, restore: !!restore, after: state.comboAfter === "tower" ? "tower" : "farm" });
 
   const sendPd = (i, kind) => post(i, { type: "pd", kind });
 
@@ -306,7 +307,7 @@
       '<div class="modes">' +
       // Chỉ hiện biểu tượng cho gọn; rê chuột vào để xem tên nút
       MODES.map((m) => '<button class="sm" data-m="' + m[0] + '" title="' + m[2] + '" aria-label="' + m[2] + '">' + m[1] + '</button>').join("") +
-      '<button class="sm" data-m="combo" title="Chạy tất cả: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công" aria-label="Chạy tất cả">▶</button>' +
+      '<button class="sm" data-m="combo" title="Chạy PB + NV: làm hết Phó Bản, rồi Nhiệm Vụ, xong về Luyện Công hoặc Leo Tháp (chọn ở menu bên trái)" aria-label="Chạy tất cả">▶</button>' +
       '<button class="sm" data-boss title="Boss tuần: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng)" aria-label="Boss tuần">👹</button>' +
       '<button class="sm" data-pet title="Bắt thú: bật / tắt đi tìm những loài thú chưa có trong Thú điển (đứng ở bãi có loài còn thiếu và luyện công)" aria-label="Bắt thú">🐾</button>' +
       '<button class="sm" data-sell title="Bán đồ xanh trong hành trang (đồ khóa, đồ đang mặc, đồ bạn đặt giữ được giữ lại)" aria-label="Bán đồ xanh">💰</button>' +
@@ -400,6 +401,18 @@
   comboBtn.title = "Tất cả nhân vật: làm hết Phó Bản (PB), rồi Nhiệm Vụ (NV), xong về Luyện Công";
   comboBtn.onclick = () => forOn((i) => setDesired(i, "combo"));
   allBox.appendChild(comboBtn);
+  // Chế độ sau khi chạy xong Phó Bản + Nhiệm Vụ (áp dụng từ lần chạy kế tiếp)
+  const comboSel = document.createElement("select");
+  [["farm", "Xong → Luyện Công"], ["tower", "Xong → Leo Tháp"]].forEach(([v, t]) => {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = t;
+    comboSel.appendChild(o);
+  });
+  comboSel.value = state.comboAfter === "tower" ? "tower" : "farm";
+  comboSel.title = "Chế độ sau khi chạy xong Phó Bản + Nhiệm Vụ: về Luyện Công hoặc Leo Tháp (áp dụng từ lần bấm Chạy PB + NV kế tiếp)";
+  comboSel.onchange = () => { state.comboAfter = comboSel.value; save(); };
+  allBox.appendChild(comboSel);
   MODES.forEach((m) => {
     const b = document.createElement("button");
     b.textContent = m[1] + " " + m[2];

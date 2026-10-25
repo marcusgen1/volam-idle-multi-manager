@@ -1,6 +1,6 @@
 // Máy chủ cục bộ cho trang quản lý nhiều cửa sổ game.
 //  - http://127.0.0.1:8800/            : trang quản lý (app.html)
-//  - http://127.0.0.1:8801 .. 88xx     : chuyển tiếp tới https://volamidle.pages.dev (mỗi khung một cổng, mặc định 12 cổng)
+//  - http://127.0.0.1:8801 .. 88xx     : chuyển tiếp tới https://volamidle.pages.dev (mỗi khung một cổng, mặc định 4 cổng)
 // Mỗi cổng là một origin riêng nên localStorage / sessionStorage của các khung tách biệt nhau.
 // Chỉ lắng nghe trên 127.0.0.1 (chỉ máy bạn truy cập được).
 // Nội dung chuyển tiếp không bị lưu lại. Điều duy nhất được thay đổi: trang HTML của game được chèn thêm
@@ -14,7 +14,7 @@ const { execFile } = require("child_process");
 const TARGET_HOST = "volamidle.pages.dev";
 const BASE_PORT = 8800;
 // Số cổng khung mở sẵn = số khung tối đa thêm được. Đổi bằng biến môi trường, ví dụ: VL_SLOTS=8 npm start
-const SLOTS = Math.min(50, Math.max(1, parseInt(process.env.VL_SLOTS, 10) || 12));
+const SLOTS = Math.min(50, Math.max(1, parseInt(process.env.VL_SLOTS, 10) || 4));
 const BIND = "127.0.0.1";
 const AGENT_TAG = '<script src="/__agent.js"></script>';
 
