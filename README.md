@@ -142,6 +142,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Mở rương ngựa** (🐎, mục Tất cả): mở hết Rương Ngựa đang có. Trước hết mở rương trong "túi vật phẩm" của Hành trang bằng nút **Dùng ×N** của game
   (mở tối đa 10 rương mỗi lần bấm), rồi mở nốt rương nằm thành chồng trong lưới hành trang từng cái một qua Kỳ Trân Các › "Thú cưỡi" › Dùng.
   Ngựa vào hành trang, Quý trở lên tự khóa. Dừng khi hết rương hoặc game báo lỗi (ví dụ "Hành trang đầy").
+- **Mua lệnh bài Dã Tẩu** (🎫, mục Tất cả, hỏi xác nhận): mua hết Lệnh Bài Dã Tẩu có thể mua bằng **KNB khóa** ở Kỳ Trân Các (bảng "🔒 Bảng KNB khóa" › thẻ "Ủy thác & nhiệm vụ";
+  2 KNB khóa / cái, tối đa 100 cái mỗi ngày). Bấm ×10 rồi Mua cho tới khi đủ số lượt trong ngày hoặc hết KNB khóa; báo số đã mua và "hôm nay X/100".
 - **Gửi đồ Hoàng Kim** (📨, mục Tất cả, dùng chung ô tên người nhận với Gửi hết KNB; hỏi xác nhận, không hoàn tác): mở Hộp thư rồi gửi mọi món
   Hoàng Kim trong hành trang (ô có lớp `r4`), mỗi thư tối đa 10 món (giới hạn của game) và lặp tới khi hết. Đồ khóa 🔒, đồ giữ cho Dã Tẩu,
   đồ đang mặc và đồ Bạch Kim được giữ lại. Gửi bằng thư thường (không phải thư giao dịch).
