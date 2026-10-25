@@ -136,6 +136,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   - Đổi: mở Kỳ Trân Các và bấm mua KNB (1 KNB = 10 vạn lượng, giới hạn mỗi ngày — hiện 5.000) cho tới khi ngân lượng chỉ còn **số vạn lượng ở ô "Giữ lại"** (mặc định 500).
     Số ngân lượng lấy từ bản lưu của game (cũ tới ~10 giây nên chỉ đổi ít hơn chứ không đổi quá). Game không cho đổi ngược KNB → lượng. Kỳ Trân Các có hai bảng, script tự chuyển sang "💰 Bảng Kim Nguyên Bảo". KNB khóa không gửi thư được nên không tính vào "Gửi hết KNB".
   - Gửi: mở Hộp thư, gửi **toàn bộ KNB** đang có cho nhân vật ở ô "Gửi KNB cho nhân vật" (không kèm đồ, không phải thư giao dịch). Chỉ dùng được với tài khoản online.
+- **Mở rương ngựa** (🐎, mục Tất cả): mở hết Rương Ngựa đang có bằng đúng nút của game (Kỳ Trân Các › "💰 Bảng Kim Nguyên Bảo" › thẻ "Thú cưỡi" ›
+  Dùng; mỗi lần bấm mở 1 rương, ngựa vào hành trang, Quý trở lên tự khóa). Dừng khi hết rương hoặc game báo lỗi (ví dụ "Hành trang đầy").
 - **Gửi đồ Hoàng Kim** (📨, mục Tất cả, dùng chung ô tên người nhận với Gửi hết KNB; hỏi xác nhận, không hoàn tác): mở Hộp thư rồi gửi mọi món
   Hoàng Kim trong hành trang (ô có lớp `r4`), mỗi thư tối đa 10 món (giới hạn của game) và lặp tới khi hết. Đồ khóa 🔒, đồ giữ cho Dã Tẩu,
   đồ đang mặc và đồ Bạch Kim được giữ lại. Gửi bằng thư thường (không phải thư giao dịch).
