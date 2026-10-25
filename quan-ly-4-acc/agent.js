@@ -691,8 +691,10 @@
   }
 
   // Mở hết Rương Ngựa: Kỳ Trân Các > thẻ "Thú cưỡi" > [Dùng] (mỗi lần bấm mở 1 rương, ngựa vào hành trang; Quý trở lên tự khóa).
-  // Số rương lấy từ gợi ý của nút ("Dùng 1 (đang có N)"). Sau mỗi lần bấm chờ số rương còn lại giảm; game báo lỗi (ví dụ
-  // "Hành trang đầy") thì dừng và ghi lý do. Tên ngựa nhận được lấy từ thông báo nổi của game.
+  // Số rương (gồm cả rương nằm trong hành trang) lấy từ gợi ý của nút ("Dùng 1 (đang có N)"). Sau khi bấm [Dùng] game KHÔNG vẽ lại
+  // cửa sổ nên số "đang có" đứng yên: chờ thông báo nổi của game (tên ngựa nhận được, hoặc lỗi như "Hành trang đầy"), rồi bấm lại thẻ
+  // đang mở để game vẽ lại cửa sổ và đọc lại số rương còn lại.
+  const TOAST_ERR = /^(Hành trang đầy|Túi đầy|Không có|Không đủ|Cần |Tối đa|Đang )|lỗi/i;
   async function pdRngua() {
     if (!q("#mswMenu")) return "Chưa vào game";
     if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
@@ -706,6 +708,12 @@
         const m = b && String(b.title || "").match(/đang có\s*(\d+)/);
         return b ? (m ? +m[1] : 0) : -1; // -1 = không còn nút (cửa sổ đổi)
       };
+      // Vẽ lại cửa sổ Kỳ Trân Các: bấm thẻ danh mục đang chọn (game vẽ lại cả cửa sổ rồi mới có số rương mới)
+      const refresh = async () => {
+        const cur = q("#mBody [data-kc].on") || q('#mBody [data-kc]');
+        if (cur) cur.click();
+        await wait(250);
+      };
       const total = count();
       if (!(total > 0)) {
         closeModalBtn();
@@ -713,6 +721,7 @@
       }
       let opened = 0;
       let stop = "";
+      let stuck = 0;
       const horses = [];
       for (let guard = 0; guard < 400 && !stop; guard++) {
         const btn = btnNow();
@@ -722,21 +731,29 @@
         }
         if (btn.disabled) break; // hết rương
         const before = count();
-        await waitFor(() => !toastOn(), 2500);
+        await waitFor(() => !toastOn(), 2500); // chờ thông báo cũ tắt để không đọc nhầm
         btn.click();
-        let toast = "";
-        const done = await waitFor(() => {
-          toast = toastOn() || toast;
-          const b = btnNow();
-          return !b || b.disabled || count() < before;
-        }, 15000);
-        if (!done) {
-          stop = toast || "game không phản hồi";
+        const toast = await waitFor(() => toastOn(), 15000);
+        if (!toast) {
+          stop = "game không phản hồi";
           break;
         }
-        opened++;
-        if (toast) horses.push(toast.replace(/^Rương Ngựa\s*(\(\d+\))?\s*:?\s*/, ""));
-        await wait(150);
+        if (TOAST_ERR.test(toast)) {
+          stop = toast;
+          break;
+        }
+        const many = toast.match(/Mở\s+(\d+)\s+Rương/); // "Mở N Rương Ngựa" khi mở nhiều cùng lúc
+        opened += many ? +many[1] : 1;
+        horses.push(toast.replace(/^Rương Ngựa\s*(\(\d+\))?\s*:?\s*/, ""));
+        await waitFor(() => !toastOn(), 2500);
+        await refresh();
+        const after = count();
+        if (after >= 0 && after >= before) {
+          // số rương không giảm dù đã báo mở: thử vẽ lại thêm một lần, vẫn vậy thì dừng để khỏi lặp vô hạn
+          await wait(600);
+          await refresh();
+          if (count() >= before && ++stuck >= 2) stop = "số Rương Ngựa không giảm sau khi mở";
+        } else stuck = 0;
       }
       closeModalBtn();
       if (!opened) return stop ? "không mở được: " + stop : "không có Rương Ngựa nào";
