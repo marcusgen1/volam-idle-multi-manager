@@ -528,20 +528,32 @@
     }
   };
   allBox.appendChild(doiBtn);
-  allBox.appendChild(labelEl("Gửi KNB cho nhân vật:"));
+  allBox.appendChild(labelEl("Gửi thư cho nhân vật (KNB, đồ HK):"));
   allBox.appendChild(inputEl("text", state.knbTo || "", "Tên nhân vật nhận", (v) => { state.knbTo = v.trim(); save(); }));
   const guiKnbBtn = document.createElement("button");
   guiKnbBtn.textContent = "📨 Gửi hết KNB";
-  guiKnbBtn.title = "Tất cả nhân vật: gửi hết Kim Nguyên Bảo đang có cho nhân vật ở ô trên bằng thư";
+  guiKnbBtn.title = "Tất cả nhân vật: gửi hết Kim Nguyên Bảo đang có cho nhân vật ở ô trên bằng thư (KNB khóa không gửi được)";
   guiKnbBtn.onclick = () => {
     const idxs = activeSlots();
     const to = String(state.knbTo || "").trim();
-    if (!to) { alert("Nhập tên nhân vật nhận KNB ở ô phía trên nút."); return; }
+    if (!to) { alert("Nhập tên nhân vật nhận ở ô phía trên nút."); return; }
     if (idxs.length && confirm("Gửi HẾT Kim Nguyên Bảo của " + idxs.length + " khung đang bật cho nhân vật \"" + to + "\" qua thư?\n\nThư đã gửi không thể thu hồi.")) {
       idxs.forEach((i) => post(i, { type: "pd", kind: "knb", to }));
     }
   };
   allBox.appendChild(guiKnbBtn);
+  const guiHkBtn = document.createElement("button");
+  guiHkBtn.textContent = "📨 Gửi đồ Hoàng Kim";
+  guiHkBtn.title = "Tất cả nhân vật: gửi hết đồ Hoàng Kim trong hành trang cho nhân vật ở ô trên bằng thư (tối đa 10 món / thư; bỏ đồ khóa, đồ đang mặc và đồ Bạch Kim)";
+  guiHkBtn.onclick = () => {
+    const idxs = activeSlots();
+    const to = String(state.knbTo || "").trim();
+    if (!to) { alert("Nhập tên nhân vật nhận ở ô phía trên nút."); return; }
+    if (idxs.length && confirm("Gửi HẾT đồ Hoàng Kim trong hành trang của " + idxs.length + " khung đang bật cho nhân vật \"" + to + "\" qua thư?\n\nĐồ khóa 🔒, đồ đang mặc và đồ Bạch Kim được giữ lại. Thư đã gửi không thể thu hồi.")) {
+      idxs.forEach((i) => post(i, { type: "pd", kind: "hk", to }));
+    }
+  };
+  allBox.appendChild(guiHkBtn);
 
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
