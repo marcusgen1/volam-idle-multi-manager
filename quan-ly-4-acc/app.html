@@ -362,8 +362,6 @@
       '<button class="sm" data-pdu title="Dùng bình PD: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
       '<button class="sm" data-pdh title="Mở hồng bao: mở hết Hồng Bao và Đại Hồng Bao đang có (lượng / Kim Nguyên Bảo ngẫu nhiên)" aria-label="Mở hồng bao">🧧</button>' +
       '<button class="sm" data-pdo title="Mở hết PD: mở hết rương Phúc Duyên trong Phần thưởng (mỗi rương 10 điểm)" aria-label="Mở hết rương Phúc Duyên">🎁</button>' +
-      '<button class="sm" data-hkc title="Xem món HK tốt nhất: với mỗi nhóm Hoàng Kim cùng tên trong hành trang, cho biết món nào tốt nhất (chỉ liệt kê)" aria-label="Xem món HK tốt nhất">🔎</button>' +
-      '<button class="sm" data-hkm title="Cất món HK tốt nhất: với mỗi nhóm Hoàng Kim cùng tên (từ 2 món), cất MỘT món tốt nhất vào Rương Chứa Đồ (hỏi xác nhận)" aria-label="Cất món HK tốt nhất">🏆</button>' +
       '<span class="st"></span></div>' +
       '<div class="frame"></div>';
     main.appendChild(slot);
@@ -380,8 +378,6 @@
     slot.querySelector("[data-pdd]").onclick = () => sendPd(idx(), "dong");
     slot.querySelector("[data-pdu]").onclick = () => sendPd(idx(), "dung");
     slot.querySelector("[data-pdo]").onclick = () => sendPd(idx(), "mo");
-    slot.querySelector("[data-hkc]").onclick = () => bestMsg(idx(), true);
-    slot.querySelector("[data-hkm]").onclick = () => { const i = idx(); if (confirmBest([i])) bestMsg(i, false); };
     slot.querySelector("[data-pdh]").onclick = () => sendPd(idx(), "hb");
     slot.querySelector('[data-a="reload"]').onclick = () => { const i = idx(); if (state.slots[i].on) mount(i, true); };
     slot.querySelector('[data-a="max"]').onclick = () => { const i = idx(); maxed = maxed === i ? -1 : i; applyLayout(); };
@@ -811,22 +807,6 @@
   };
   allBox.appendChild(guiHkBtn);
 
-  // Hành trang có nhiều món Hoàng Kim cùng tên: chọn MỘT món tốt nhất của mỗi nhóm trùng rồi cất vào Rương Chứa Đồ
-  const confirmBest = (idxs) => confirm("Với mỗi nhóm Hoàng Kim cùng tên (từ 2 món trở lên) trong hành trang, chọn ra MỘT món tốt nhất (các dòng gần max nhất) và cất vào Rương Chứa Đồ, ở " + (idxs.length === 1 ? "khung " + (idxs[0] + 1) : idxs.length + " khung đang bật") + "?\n\nCác món còn lại giữ nguyên trong hành trang. Bấm 🔎 Xem món HK tốt nhất trước để xem script chọn món nào. Lấy lại được ở 📦 Rương Chứa Đồ.");
-  const bestMsg = (i, dry) => post(i, { type: "pd", kind: "hkbest", dry: !!dry });
-  const hkViewBtn = document.createElement("button");
-  hkViewBtn.textContent = "🔎 Xem món HK tốt nhất";
-  hkViewBtn.title = "Tất cả nhân vật: với mỗi nhóm Hoàng Kim cùng tên trong hành trang, cho biết món nào tốt nhất (điểm trung bình mỗi dòng so với khoảng [min ~ max]). Chỉ liệt kê ở dòng trạng thái, không cất gì.";
-  hkViewBtn.onclick = () => activeSlots().forEach((i) => bestMsg(i, true));
-  allBox.appendChild(hkViewBtn);
-  const hkBestBtn = document.createElement("button");
-  hkBestBtn.textContent = "🏆 Cất món HK tốt nhất";
-  hkBestBtn.title = "Tất cả nhân vật: với mỗi nhóm Hoàng Kim cùng tên (từ 2 món) trong hành trang, cất MỘT món tốt nhất vào Rương Chứa Đồ; các món còn lại giữ nguyên (cả món đang khóa 🔒 được xét; bỏ qua ô 📜 giữ cho Dã Tẩu).";
-  hkBestBtn.onclick = () => {
-    const idxs = activeSlots();
-    if (idxs.length && confirmBest(idxs)) idxs.forEach((i) => bestMsg(i, false));
-  };
-  allBox.appendChild(hkBestBtn);
 
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
