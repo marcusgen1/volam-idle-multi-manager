@@ -287,19 +287,48 @@ function proxyList() {
   return out;
 }
 
-// Trả { ip, ms }: IP máy chủ game thấy và thời gian cả chuyến (gồm nối proxy + TLS)
-const traceIp = (ag) =>
+// Trả { ip, loc, ms }: IP + nước máy chủ game thấy và thời gian cả chuyến (gồm nối proxy + TLS)
+const traceIp = (ag, timeout = 20000) =>
   new Promise((resolve, reject) => {
     const t0 = Date.now();
-    const r = https.request({ host: TARGET_HOST, path: "/cdn-cgi/trace", agent: ag, timeout: 20000 }, (ur) => {
+    const r = https.request({ host: TARGET_HOST, path: "/cdn-cgi/trace", agent: ag, timeout }, (ur) => {
       let b = "";
       ur.on("data", (c) => (b += c));
-      ur.on("end", () => resolve({ ip: (b.match(/^ip=(.+)$/m) || [])[1] || "?", ms: Date.now() - t0 }));
+      ur.on("end", () => resolve({ ip: (b.match(/^ip=(.+)$/m) || [])[1] || "?", loc: (b.match(/^loc=(.+)$/m) || [])[1] || "", ms: Date.now() - t0 }));
     });
     r.on("timeout", () => r.destroy(new Error("Hết thời gian chờ")));
     r.on("error", reject);
     r.end();
   });
+
+// Danh sách proxy chọn sẵn: proxy-presets.json (đi kèm repo, proxy công cộng) + proxy-presets.local.json (của riêng bạn, có thể chứa mật khẩu, không đưa lên GitHub)
+function loadPresets() {
+  const out = [];
+  for (const f of ["proxy-presets.json", "proxy-presets.local.json"]) {
+    let arr = [];
+    try { arr = JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf8")); } catch {}
+    for (const p of Array.isArray(arr) ? arr : []) {
+      if (!p || typeof p.url !== "string") continue;
+      try { out.push({ url: p.url.trim(), label: describeProxy(p.url), country: String(p.country || "").toUpperCase().slice(0, 2), note: String(p.note || "").slice(0, 40) }); } catch {}
+    }
+  }
+  return out;
+}
+const presetView = (list) => list.map((p, id) => ({ id, label: p.label, country: p.country, note: p.note })); // không gửi URL (có thể chứa mật khẩu) ra trang
+
+// Kiểm tra song song tất cả proxy chọn sẵn (tối đa 8 cái cùng lúc): proxy nào sống, IP + nước game thấy, độ trễ
+async function testPresets(list) {
+  const res = new Array(list.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(8, list.length) }, async () => {
+    while (next < list.length) {
+      const i = next++;
+      const ag = new ProxyAgent(list[i].url);
+      try { res[i] = Object.assign({ id: i, ok: true }, await traceIp(ag, 12000)); } catch (e) { res[i] = { id: i, ok: false, error: e.message }; } finally { ag.destroy(); }
+    }
+  }));
+  return res;
+}
 
 let directIp = { ip: "", at: 0 };
 function proxyApi(req, res, url) {
@@ -307,9 +336,11 @@ function proxyApi(req, res, url) {
     res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     res.end(JSON.stringify(obj));
   };
+  if (req.method === "GET" && url === "/__proxy/presets") return send(200, { presets: presetView(loadPresets()) });
   if (req.method === "GET") return send(200, { slots: proxyList(), stat: proxyStat });
   if (req.method !== "POST" || !trusted(req)) return send(403, { error: "forbidden" });
   readBody(req).then(async (b) => {
+    if (url === "/__proxy/presets/test") return send(200, { results: await testPresets(loadPresets()) });
     const slot = parseInt(b.slot, 10);
     if (!(slot >= 1 && slot <= SLOTS)) return send(400, { error: "Khung không hợp lệ" });
     if (url === "/__proxy/test") {
@@ -326,7 +357,12 @@ function proxyApi(req, res, url) {
       }
     }
     if (url !== "/__proxy") return send(404, { error: "not found" });
-    const u = String(b.url || "").trim();
+    let u = String(b.url || "").trim();
+    if (b.preset != null) {
+      const p = loadPresets()[parseInt(b.preset, 10)];
+      if (!p) return send(400, { error: "Proxy chọn sẵn không còn trong danh sách" });
+      u = p.url;
+    }
     if (u) {
       try { parseProxy(u); } catch (e) { return send(400, { error: e.message }); }
       proxyCfg[slot] = u;
