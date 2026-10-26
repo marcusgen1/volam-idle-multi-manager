@@ -169,6 +169,9 @@ rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để
 - Với khung có proxy, **cả trang game lẫn mọi kết nối game gọi ra `*.volamidle.net`** (đăng nhập, dữ liệu, WebSocket) đều đi qua proxy, nên máy chủ game thấy IP của proxy.
   Cách làm: `px-shim.js` được chèn vào khung đó, đổi các lời gọi `fetch` / `XMLHttpRequest` / `WebSocket` tới `*.volamidle.net` thành gọi về cổng của khung, máy chủ cục bộ chuyển tiếp qua proxy.
   Chỉ máy chủ của game được phép đi qua đường này (thêm tên miền khác bằng `VL_PX_ALLOW=ten-mien.com`).
+- **Trạng thái kết nối** hiện ngay cạnh nút 🌐 của khung 5: `● <IP game thấy> · <thời gian phản hồi>` (xanh) khi proxy chạy tốt; `● IP trùng máy` (vàng) khi proxy chưa đổi được IP;
+  `● không kết nối` / `● proxy lỗi` (đỏ) khi kiểm tra thất bại hoặc game vừa gặp lỗi qua proxy; `○ chưa đặt proxy` khi khung dùng IP máy. Rê chuột vào để xem chi tiết (proxy, IP máy, giờ kiểm tra, nội dung lỗi), bấm vào để kiểm tra lại ngay.
+  App tự kiểm tra mỗi 60 giây (một yêu cầu nhỏ qua proxy) và đọc lỗi thật từ lưu lượng game mỗi 10 giây.
 - Các khung 1–4 chạy như cũ. Proxy gắn với **cổng** của khung (cổng 8805), không gắn với vị trí hiển thị: xóa khung 1–4 rồi thêm lại không làm khung 5 mất proxy. Khung 5 là khung được thêm sau cùng khi 4 khung đầu còn đủ.
 - **Proxy MTProto của Telegram (Server / Port / Secret) không dùng được**: nó chỉ chạy cho ứng dụng Telegram. Cần proxy HTTP/HTTPS hoặc SOCKS5.
 - Thư viện chống bot của game (nếu bật) và font / ảnh từ CDN vẫn tải trực tiếp từ máy bạn. Nếu proxy hỏng, khung đó không tải được game (không tự quay về IP máy để tránh lộ IP thật).
