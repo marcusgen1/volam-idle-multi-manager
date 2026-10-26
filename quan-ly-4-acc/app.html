@@ -117,6 +117,12 @@
     const r = await fetch("/__config", { cache: "no-store" });
     if (r.ok) cfg = Object.assign(cfg, await r.json());
   } catch (e) {}
+  // Proxy riêng của từng khung (khóa = số cổng p), máy chủ giữ ở proxy.json; chỉ lấy bản đã che mật khẩu
+  let pxList = {};
+  try {
+    const r = await fetch("/__proxy", { cache: "no-store" });
+    if (r.ok) pxList = (await r.json()).slots || {};
+  } catch (e) {}
   const BASE_PORT = cfg.base | 0 || 8800;
   const MAX_SLOTS = Math.max(1, cfg.max | 0 || 4);
 
@@ -302,6 +308,7 @@
     slot.innerHTML =
       '<div class="bar"><span class="num"></span>' +
       '<span class="label"></span>' +
+      '<button class="sm" data-a="px">🌐</button>' +
       '<button class="sm" data-a="reload" title="Tải lại khung này">⟳</button>' +
       '<button class="sm" data-a="max" title="Phóng to / thu nhỏ">⛶</button>' +
       '<button class="sm" data-a="power" title="Tắt / bật khung (giảm tải máy)">⏻</button>' +
@@ -339,8 +346,53 @@
     slot.querySelector('[data-a="max"]').onclick = () => { const i = idx(); maxed = maxed === i ? -1 : i; applyLayout(); };
     slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); };
     slot.querySelector('[data-a="del"]').onclick = () => removeSlot(c);
+    slot.querySelector('[data-a="px"]').onclick = () => setPx(idx());
     mount(els.length - 1, s.on);
+    renderPx();
     return c;
+  }
+
+  // ----- Proxy riêng cho khung (đổi IP) -----
+  function renderPx() {
+    els.forEach((c, i) => {
+      const b = c.slot.querySelector('[data-a="px"]');
+      const u = pxList[state.slots[i].p];
+      b.classList.toggle("on", !!u);
+      b.title = u ? "Đang dùng proxy " + u + " (bấm để đổi / tắt)" : "Đặt proxy riêng cho khung này để đổi IP (khung chạy ở cổng " + (BASE_PORT + state.slots[i].p) + ")";
+    });
+  }
+  async function pxPost(path, body) {
+    const r = await fetch(path, { method: "POST", headers: { "x-vl": "1", "content-type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || "lỗi " + r.status);
+    return j;
+  }
+  async function setPx(i) {
+    const p = state.slots[i].p;
+    const v = prompt(
+      "Proxy cho khung " + (i + 1) + " (cổng " + (BASE_PORT + p) + ").\n" +
+      "Dạng: http://user:pass@host:port  hoặc  socks5://user:pass@host:port\n" +
+      "(Proxy MTProto của Telegram — Server / Port / Secret — không dùng được cho game.)\n" +
+      (pxList[p] ? "Đang dùng: " + pxList[p] + "\n" : "") +
+      "Để trống = tắt proxy cho khung này.",
+      ""
+    );
+    if (v === null) return;
+    try {
+      const j = await pxPost("/__proxy", { slot: p, url: v.trim() });
+      pxList = j.slots || {};
+      renderPx();
+      if (!v.trim()) logToast("Proxy", "Khung " + (i + 1) + ": đã tắt proxy (dùng IP máy này)");
+      else {
+        const t = await pxPost("/__proxy/test", { slot: p });
+        if (t.error) logToast("Proxy", "Khung " + (i + 1) + ": đã lưu nhưng kiểm tra lỗi — " + t.error);
+        else if (t.proxy === t.direct) logToast("Proxy", "Khung " + (i + 1) + ": IP qua proxy " + t.proxy + " GIỐNG IP máy này — proxy chưa đổi được IP");
+        else logToast("Proxy", "Khung " + (i + 1) + ": IP máy " + t.direct + " → IP qua proxy " + t.proxy);
+      }
+      if (state.slots[i].on) mount(i, true); // tải lại để khung dùng proxy mới
+    } catch (e) {
+      logToast("Proxy", "Khung " + (i + 1) + ": " + e.message);
+    }
   }
 
   function addSlot() {
@@ -385,6 +437,7 @@
       c.slot.querySelector(".num").textContent = i + 1;
       c.slot.querySelector('[data-a="del"]').disabled = n <= 1;
     });
+    renderPx();
     const add = document.getElementById("addSlot");
     add.disabled = n >= MAX_SLOTS;
     add.title = n >= MAX_SLOTS ? "Đã đủ " + MAX_SLOTS + " khung (số cổng máy chủ đã mở)" : "Thêm một khung game mới (" + n + "/" + MAX_SLOTS + ")";

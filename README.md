@@ -1,6 +1,6 @@
 # Võ Lâm Idle – Quản lý nhiều nhân vật
 
-Trang quản lý chạy **nhiều cửa sổ game cạnh nhau trong một trang** (mặc định và tối đa 4; muốn nhiều hơn thì đặt `VL_SLOTS`), mỗi cửa sổ đăng nhập một tài khoản riêng,
+Trang quản lý chạy **nhiều cửa sổ game cạnh nhau trong một trang** (mặc định và tối đa 5; muốn nhiều hơn thì đặt `VL_SLOTS`), mỗi cửa sổ đăng nhập một tài khoản riêng,
 kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh, bán HK cơ bản, đóng bình / dùng hết bình / mở hết rương Phúc Duyên…).
 
 > Repo riêng tư. Không chứa mã của game: máy chủ cục bộ chuyển tiếp trang game từ `https://volamidle.pages.dev` lúc chạy.
@@ -27,8 +27,8 @@ Cần **Node.js 18.11 trở lên**.
 
 Sau đó mở <http://127.0.0.1:8800/>.
 
-- Cổng `8800`: trang quản lý. Cổng `8801`–`8804` (mặc định 4 cổng, đổi bằng `VL_SLOTS`): các bản chuyển tiếp tới game, mỗi cổng là một *origin* riêng nên
-  4 tài khoản có kho lưu trữ / phiên đăng nhập riêng, không đè nhau.
+- Cổng `8800`: trang quản lý. Cổng `8801`–`8805` (mặc định 5 cổng, đổi bằng `VL_SLOTS`): các bản chuyển tiếp tới game, mỗi cổng là một *origin* riêng nên
+  các tài khoản có kho lưu trữ / phiên đăng nhập riêng, không đè nhau.
 - Máy chủ chỉ lắng nghe `127.0.0.1` (chỉ máy bạn truy cập được).
 - Điều duy nhất được thay đổi so với trang gốc: HTML của game được chèn thêm một dòng `<script src="/__agent.js">`
   (`quan-ly-4-acc/agent.js`) để trang quản lý điều khiển chế độ chơi.
@@ -69,13 +69,13 @@ Nhấn `Ctrl+C` trong terminal để tắt (các khung game sẽ mất kết n�
 
 ### 3. Máy Linux không có màn hình (VPS / server) – truy cập từ máy khác
 
-Máy chủ chỉ nghe trên `127.0.0.1`, nên dùng **SSH tunnel** và phải chuyển tiếp **cả 5 cổng** (8800 cho trang quản lý
-và 8801–8804 cho các khung game, vì trình duyệt của bạn gọi trực tiếp các cổng này; chỉ cần các cổng bạn dùng):
+Máy chủ chỉ nghe trên `127.0.0.1`, nên dùng **SSH tunnel** và phải chuyển tiếp **cả 6 cổng** (8800 cho trang quản lý
+và 8801–8805 cho các khung game, vì trình duyệt của bạn gọi trực tiếp các cổng này; chỉ cần các cổng bạn dùng):
 
 ```bash
 ssh -N \
   -L 8800:127.0.0.1:8800 -L 8801:127.0.0.1:8801 -L 8802:127.0.0.1:8802 \
-  -L 8803:127.0.0.1:8803 -L 8804:127.0.0.1:8804 \
+  -L 8803:127.0.0.1:8803 -L 8804:127.0.0.1:8804 -L 8805:127.0.0.1:8805 \
   nguoidung@dia-chi-may-linux
 ```
 
@@ -103,7 +103,7 @@ nên lần sau game nhớ đăng nhập. Phương án này không dùng trang qu
 | `EADDRINUSE` (cổng đã được dùng) | Đã có một máy chủ đang chạy: `ss -ltnp \| grep 880` rồi tắt tiến trình cũ |
 | `node: not found` hoặc `--watch` không nhận | Node.js chưa cài hoặc cũ hơn 18.11: xem lại mục 1 |
 | Trang trắng ở các khung game | Máy cần truy cập được `https://volamidle.pages.dev` (kiểm tra mạng / proxy) |
-| Dùng SSH tunnel mà khung game không tải | Thiếu cổng của khung đó (8801–8804) trong lệnh `ssh -L` |
+| Dùng SSH tunnel mà khung game không tải | Thiếu cổng của khung đó (8801–8805) trong lệnh `ssh -L` |
 
 ## Cập nhật từ GitHub
 
@@ -118,7 +118,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 
 ## Tính năng chính
 
-- **Thêm / xóa khung**: nút **＋ Thêm khung** ở đầu trang (tối đa bằng số cổng máy chủ mở, mặc định 4) và nút **✕** ở mỗi khung. Mỗi khung giữ một cổng cố định nên xóa một khung không làm mất phiên đăng nhập của khung khác. Muốn nhiều hoặc ít khung hơn: `VL_SLOTS=8 npm start`. Mỗi khung là một bản game chạy riêng nên càng nhiều khung máy càng nặng.
+- **Thêm / xóa khung**: nút **＋ Thêm khung** ở đầu trang (tối đa bằng số cổng máy chủ mở, mặc định 5) và nút **✕** ở mỗi khung. Mỗi khung giữ một cổng cố định nên xóa một khung không làm mất phiên đăng nhập của khung khác. Muốn nhiều hoặc ít khung hơn: `VL_SLOTS=8 npm start`. Mỗi khung là một bản game chạy riêng nên càng nhiều khung máy càng nặng.
 - Chọn chế độ cho tất cả hoặc từng khung: Luyện Công, Nhiệm Vụ, Phó Bản, Leo Tháp, **Chạy PB + NV** (Phó Bản → Nhiệm Vụ).
   Ô chọn ngay dưới nút Chạy PB + NV đặt chế độ sau khi chạy xong: Luyện Công (mặc định) hoặc Leo Tháp (áp dụng từ lần bấm kế tiếp).
   Nhiệm Vụ / Phó Bản chạy riêng thì tự về Luyện Công khi hết việc; Leo Tháp tự vào lại khi gục ngã và dừng sau 3 lần chết liên tiếp.
@@ -159,6 +159,19 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ. Vì vậy khi chọn Nhiệm Vụ, Phó Bản hoặc Chạy PB + NV mà đang ở bố cục 1 hàng, trang tự chuyển về lưới.
 
 Mật khẩu **không** được lưu trong trang này; hãy dùng "Nhớ tài khoản" của game và trình quản lý mật khẩu của Chrome.
+
+## Proxy riêng cho từng khung (đổi IP)
+
+Nút **🌐** ở thanh tiêu đề mỗi khung: dán proxy dạng `http://user:pass@host:port` hoặc `socks5://user:pass@host:port` (bỏ `user:pass@` nếu proxy không cần đăng nhập).
+Máy chủ lưu vào `quan-ly-4-acc/proxy.json` (không đưa lên GitHub; cũng đặt được bằng biến môi trường `VL_PROXY_5=socks5://host:port`), kiểm tra bằng cách so IP máy với IP qua proxy,
+rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để trống ô nhập để tắt.
+
+- Với khung có proxy, **cả trang game lẫn mọi kết nối game gọi ra `*.volamidle.net`** (đăng nhập, dữ liệu, WebSocket) đều đi qua proxy, nên máy chủ game thấy IP của proxy.
+  Cách làm: `px-shim.js` được chèn vào khung đó, đổi các lời gọi `fetch` / `XMLHttpRequest` / `WebSocket` tới `*.volamidle.net` thành gọi về cổng của khung, máy chủ cục bộ chuyển tiếp qua proxy.
+  Chỉ máy chủ của game được phép đi qua đường này (thêm tên miền khác bằng `VL_PX_ALLOW=ten-mien.com`).
+- Các khung không đặt proxy chạy như cũ. Proxy gắn với **cổng** của khung (khung dùng cổng 8805 thì proxy đặt cho cổng 8805), không gắn với vị trí hiển thị.
+- **Proxy MTProto của Telegram (Server / Port / Secret) không dùng được**: nó chỉ chạy cho ứng dụng Telegram. Cần proxy HTTP/HTTPS hoặc SOCKS5.
+- Thư viện chống bot của game (nếu bật) và font / ảnh từ CDN vẫn tải trực tiếp từ máy bạn. Nếu proxy hỏng, khung đó không tải được game (không tự quay về IP máy để tránh lộ IP thật).
 
 ## Lưu ý
 
