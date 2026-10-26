@@ -6,3 +6,6 @@ Thumbs.db
 
 # Bản ghi chú cũ, không còn dùng (đã thay bằng quan-ly-4-acc/app.html)
 quan-ly-4-acc/index.html
+
+# Proxy riêng từng khung (có thể chứa mật khẩu proxy)
+quan-ly-4-acc/proxy.json
