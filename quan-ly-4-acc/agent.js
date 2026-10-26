@@ -892,6 +892,95 @@
     }
   }
 
+  // Lọc đồ Hoàng Kim "max / gần max" rồi cất vào Rương Chứa Đồ. Chi tiết món (bấm ô trong thẻ Hành trang) liệt kê từng dòng thuộc tính, dòng nào có
+  // giá trị ngẫu nhiên thì kèm khoảng [min ~ max], ví dụ "Sinh lực tối đa: +112 điểm [80 ~ 120]". Mỗi dòng có khoảng được tính tỉ lệ
+  // (giá trị − min) / (max − min); từ ngưỡng % trở lên là "gần max" (100% = đúng max). Món có ít nhất N dòng như vậy thì cất vào rương
+  // bằng nút [Cất rương] của chi tiết món (cất được cả món đang khóa 🔒). Bỏ qua ô 📜 giữ cho Dã Tẩu. Chế độ kiểm tra chỉ liệt kê, không cất.
+  const HK_RNG = /\[\s*([-+−]?\d+(?:[.,]\d+)?)\s*[~–—-]\s*([-+−]?\d+(?:[.,]\d+)?)\s*\]/;
+  const numF = (t) => parseFloat(String(t).replace("−", "-").replace(",", "."));
+  const hkBagTiles = () => qa("#t-inv .invgrid .it.r4").filter((el) => !/📜/.test((el.querySelector(".lk") || {}).textContent || ""));
+  // Các dòng có khoảng [min ~ max] ở chi tiết món đang mở -> [{ text, v, lo, hi, p }] (p = tỉ lệ 0..1)
+  function readRolls() {
+    const out = [];
+    qa("#mBody .sl > div").forEach((el) => {
+      const rng = el.querySelector(".rng");
+      const m = rng && HK_RNG.exec(rng.textContent);
+      if (!m) return;
+      const lo = Math.min(numF(m[1]), numF(m[2])), hi = Math.max(numF(m[1]), numF(m[2]));
+      if (!(hi > lo)) return; // khoảng cố định: không có "max"
+      const all = el.textContent;
+      const nums = all.slice(0, all.lastIndexOf(rng.textContent)).match(/[-+−]?\d+(?:[.,]\d+)?/g);
+      if (!nums) return;
+      const v = numF(nums[nums.length - 1]);
+      out.push({ text: all.replace(/\s+/g, " ").trim(), v, lo, hi, p: Math.max(0, Math.min(1, (v - lo) / (hi - lo))) });
+    });
+    return out;
+  }
+  async function pdCatHk(m, dry) {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    const invTab = q('#tabs button[data-t="inv"]');
+    if (!invTab) return "không thấy thẻ Hành trang";
+    const pct = Math.max(1, Math.min(100, +m.pct || 90));
+    const minLines = Math.max(1, Math.floor(+m.lines || 1));
+    const prev = activeTab();
+    if (prev !== "inv") invTab.click();
+    petUi = true;
+    try {
+      await wait(200);
+      const total = hkBagTiles().length;
+      if (!total) return "không có món Hoàng Kim nào trong hành trang";
+      const tried = new Set();
+      const hit = []; // món đạt: { name, n, max, moved }
+      let seen = 0, noRoll = 0, stop = "";
+      for (let guard = 0; guard < 400 && !stop; guard++) {
+        const tile = hkBagTiles().find((el) => !tried.has(el.dataset.uid));
+        if (!tile) break;
+        tried.add(tile.dataset.uid);
+        tile.click();
+        const h4 = await waitFor(() => q("#mBody .idet h4"), 2000);
+        if (!h4) { closeModalBtn(); await wait(60); continue; }
+        await wait(40); // chi tiết vẽ xong cả danh sách dòng
+        const name = (h4.firstChild ? h4.firstChild.textContent : h4.textContent).trim();
+        const rolls = readRolls();
+        seen++;
+        if (!rolls.length) noRoll++;
+        const good = rolls.filter((r) => r.p * 100 >= pct - 1e-9);
+        if (good.length >= minLines) {
+          const rec = { name, n: good.length, max: good.filter((r) => r.p >= 1).length, moved: false };
+          hit.push(rec);
+          if (!dry) {
+            const btn = q("#bStashIt");
+            if (!btn) { rec.err = "không có nút Cất rương"; }
+            else {
+              btn.click();
+              // Món biến khỏi hành trang = đã cất; nếu không thì thông báo "Rương đầy" (hiện chừng 2 giây) có thể tắt trước khi hết hạn chờ, nên bắt ngay khi nó hiện
+              await waitFor(() => !tile.isConnected || /đầy|lỗi/i.test(toastOn()), 2500);
+              if (!tile.isConnected) rec.moved = true;
+              else {
+                const t = toastOn();
+                rec.err = t || "không cất được";
+                if (/đầy/i.test(t)) stop = t; // Rương Chứa Đồ hết chỗ: dừng
+              }
+            }
+          }
+        }
+        closeModalBtn();
+        await wait(60);
+      }
+      const tag = "≥" + pct + "%" + (minLines > 1 ? " từ " + minLines + " dòng" : "");
+      const show = hit.slice(0, 8).map((r) => r.name + " (" + r.n + " dòng" + (r.max ? ", " + r.max + " max" : "") + (r.err ? " – " + r.err : "") + ")").join("; ");
+      const rest = hit.length > 8 ? " … +" + (hit.length - 8) + " món" : "";
+      if (dry) return "đã kiểm tra " + seen + " món HK: " + hit.length + " món đạt " + tag + (show ? " → " + show + rest : "") + (noRoll ? " · " + noRoll + " món không có dòng [min ~ max] để so" : "");
+      const moved = hit.filter((r) => r.moved).length;
+      return "đã cất " + moved + "/" + hit.length + " món đạt " + tag + " vào Rương Chứa Đồ (đã xét " + seen + " món HK)" + (stop ? " · dừng: " + stop : "") + (moved ? " → " + hit.filter((r) => r.moved).slice(0, 8).map((r) => r.name).join("; ") + rest : "");
+    } finally {
+      petUi = false;
+      closeModalBtn();
+      restoreTab(prev);
+    }
+  }
+
   // Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa: Kỳ Trân Các > bảng "🔒 Bảng KNB khóa" > thẻ "Ủy thác & nhiệm vụ" > card Lệnh Bài Dã Tẩu
   // (giá và số lượng tối đa mỗi ngày đọc từ card, không cố định trong code; chữ trên card: "Hôm nay X/Y · có N"). Bấm [×10] (mua tối đa 10 cái) rồi [Mua] cho tới khi
   // nút bị khóa (đủ số lượt trong ngày hoặc hết KNB khóa) hoặc game báo lỗi. Sau mỗi lần bấm game vẽ lại cửa sổ với số "Hôm nay" mới.
@@ -965,8 +1054,8 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt };
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false) };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
