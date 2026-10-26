@@ -140,8 +140,10 @@ async function openTls(proxyUrl, host, port) {
   const raw = await openTunnel(proxyUrl, host, port);
   return new Promise((resolve, reject) => {
     const t = tls.connect({ socket: raw, servername: host, ALPNProtocols: ["http/1.1"] });
-    t.once("secureConnect", () => resolve(t));
-    t.once("error", reject);
+    // Proxy lỗi có thể nhận kết nối rồi im lặng: không đặt hạn chờ thì bắt tay TLS treo mãi
+    const timer = setTimeout(() => t.destroy(new Error("Hết thời gian chờ bắt tay TLS qua proxy")), TIMEOUT_MS);
+    t.once("secureConnect", () => { clearTimeout(timer); resolve(t); });
+    t.once("error", (e) => { clearTimeout(timer); raw.destroy(); reject(e); });
   });
 }
 
