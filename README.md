@@ -140,11 +140,12 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   - Đổi: mở Kỳ Trân Các và bấm mua KNB (1 KNB = 10 vạn lượng, giới hạn mỗi ngày — hiện 5.000) cho tới khi ngân lượng chỉ còn **số vạn lượng ở ô "Giữ lại"** (mặc định 500).
     Số ngân lượng lấy từ bản lưu của game (cũ tới ~10 giây nên chỉ đổi ít hơn chứ không đổi quá). Game không cho đổi ngược KNB → lượng. Kỳ Trân Các có hai bảng, script tự chuyển sang "💰 Bảng Kim Nguyên Bảo". KNB khóa không gửi thư được nên không tính vào "Gửi hết KNB".
   - Gửi: mở Hộp thư, gửi **toàn bộ KNB** đang có cho nhân vật ở ô "Gửi KNB cho nhân vật" (không kèm đồ, không phải thư giao dịch). Chỉ dùng được với tài khoản online.
-- **Check HK max** (🔍) và **Cất HK max** (🗄), có ở mục Tất cả và cả trên thanh nút của từng khung (dùng chung hai ô ngưỡng ở menu trái): lọc đồ Hoàng Kim có dòng thuộc tính **max hoặc gần max** rồi cất vào **Rương Chứa Đồ**.
-  Chi tiết món Hoàng Kim liệt kê từng dòng, dòng có giá trị ngẫu nhiên kèm khoảng `[min ~ max]` (ví dụ `Sinh lực tối đa: +112 điểm [80 ~ 120]`). Script mở chi tiết từng món Hoàng Kim trong thẻ Hành trang,
-  tính tỉ lệ **giá trị / max** cho mỗi dòng có khoảng (ví dụ `+11% [8 ~ 12]` = 92%, `+24% [15 ~ 25]` = 96%; khoảng có số âm thì tính theo vị trí trong khoảng). Hai ô trên nút: **ngưỡng %** (mặc định 90; 100 = đúng max) và **số dòng tối thiểu** (mặc định 1).
-  Món có đủ số dòng đạt ngưỡng thì tính là đạt. **Check** chỉ liệt kê món đạt ở dòng trạng thái (kèm số dòng đạt / dòng đúng max), không cất gì; **Cất** (hỏi xác nhận) bấm nút [Cất rương] của chi tiết món
-  (cất được cả món đang khóa 🔒, bỏ qua ô 📜 giữ cho Dã Tẩu, không đụng đồ đang mặc) và dừng khi Rương Chứa Đồ đầy. Lấy lại ở 📦 Rương Chứa Đồ của game. Dòng không có khoảng (chỉ số cố định) không được tính.
+- **Cất món HK tốt nhất** (🏆) và **Xem món HK tốt nhất** (🔎), có ở mục Tất cả và trên thanh nút của từng khung: khi hành trang có nhiều món Hoàng Kim **cùng tên** (cùng loại, khác chỉ số ngẫu nhiên),
+  với mỗi nhóm từ 2 món trở lên, chọn ra **một món tốt nhất** và cất vào **Rương Chứa Đồ** (các món còn lại ở nguyên hành trang). Chi tiết món Hoàng Kim liệt kê từng dòng, dòng có giá trị ngẫu nhiên kèm khoảng `[min ~ max]`
+  (ví dụ `Sinh lực tối đa: +112 điểm [80 ~ 120]`); điểm của món = tổng, trên mọi dòng có khoảng, của vị trí giá trị trong khoảng `(giá trị − min) / (max − min)` (hòa điểm thì lấy món có tổng giá trị / max cao hơn).
+  **Xem** chỉ liệt kê các nhóm trùng và món được chọn (điểm trung bình mỗi dòng của món tốt nhất và món thứ hai) ở dòng trạng thái; **Cất** (hỏi xác nhận) bấm nút [Cất rương] của chi tiết món,
+  cất được cả món đang khóa 🔒, bỏ qua ô 📜 giữ cho Dã Tẩu, không đụng đồ đang mặc, dừng khi Rương Chứa Đồ đầy. Lấy lại ở 📦 Rương Chứa Đồ của game.
+  (Bộ nút "Check HK max / Cất HK max" theo ngưỡng % đã tạm bỏ khỏi giao diện.)
 - **Mở rương ngựa** (🐎, mục Tất cả): mở hết Rương Ngựa đang có. Trước hết mở rương trong "túi vật phẩm" của Hành trang bằng nút **Dùng ×N** của game
   (mở tối đa 10 rương mỗi lần bấm), rồi mở nốt rương nằm thành chồng trong lưới hành trang từng cái một qua Kỳ Trân Các › "Thú cưỡi" › Dùng.
   Ngựa vào hành trang, Quý trở lên tự khóa. Dừng khi hết rương hoặc game báo lỗi (ví dụ "Hành trang đầy").

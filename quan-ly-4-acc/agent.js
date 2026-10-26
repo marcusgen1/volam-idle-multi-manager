@@ -913,7 +913,7 @@
       const nums = all.slice(0, all.lastIndexOf(rng.textContent)).match(/[-+−]?\d+(?:[.,]\d+)?/g);
       if (!nums) return;
       const v = numF(nums[nums.length - 1]);
-      out.push({ text: all.replace(/\s+/g, " ").trim(), v, lo, hi, p: Math.max(0, Math.min(1, lo >= 0 ? v / hi : (v - lo) / (hi - lo))) });
+      out.push({ text: all.replace(/\s+/g, " ").trim(), v, lo, hi, pos: Math.max(0, Math.min(1, (v - lo) / (hi - lo))), p: Math.max(0, Math.min(1, lo >= 0 ? v / hi : (v - lo) / (hi - lo))) });
     });
     return out;
   }
@@ -975,6 +975,81 @@
       if (dry) return "đã kiểm tra " + seen + " món HK: " + hit.length + " món đạt " + tag + (show ? " → " + show + rest : "") + (noRoll ? " · " + noRoll + " món không có dòng [min ~ max] để so" : "");
       const moved = hit.filter((r) => r.moved).length;
       return "đã cất " + moved + "/" + hit.length + " món đạt " + tag + " vào Rương Chứa Đồ (đã xét " + seen + " món HK)" + (stop ? " · dừng: " + stop : "") + (moved ? " → " + hit.filter((r) => r.moved).slice(0, 8).map((r) => r.name).join("; ") + rest : "");
+    } finally {
+      petUi = false;
+      closeModalBtn();
+      restoreTab(prev);
+    }
+  }
+
+  // Trong hành trang có nhiều món Hoàng Kim cùng tên (cùng loại, khác chỉ số ngẫu nhiên): với mỗi nhóm từ 2 món trở lên, chọn ra MỘT món tốt nhất
+  // rồi cất vào Rương Chứa Đồ (các món còn lại giữ nguyên trong hành trang). Điểm của món = tổng, trên mọi dòng có khoảng [min ~ max],
+  // của vị trí giá trị trong khoảng (giá trị − min) / (max − min), tức dòng càng gần max càng được nhiều điểm. Hòa điểm thì lấy món có tổng giá trị / max cao hơn.
+  // Ô 📜 (giữ cho Dã Tẩu) không xét. Chế độ xem (m.dry) chỉ liệt kê nhóm và món được chọn.
+  async function pdBestHk(m) {
+    const dry = !!m.dry;
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    const invTab = q('#tabs button[data-t="inv"]');
+    if (!invTab) return "không thấy thẻ Hành trang";
+    const prev = activeTab();
+    if (prev !== "inv") invTab.click();
+    petUi = true;
+    try {
+      await wait(200);
+      if (!hkBagTiles().length) return "không có món Hoàng Kim nào trong hành trang";
+      // Lượt 1: đọc điểm của từng món
+      const items = [];
+      const tried = new Set();
+      for (let guard = 0; guard < 400; guard++) {
+        const tile = hkBagTiles().find((el) => !tried.has(el.dataset.uid));
+        if (!tile) break;
+        tried.add(tile.dataset.uid);
+        tile.click();
+        const h4 = await waitFor(() => q("#mBody .idet h4"), 2000);
+        if (h4) {
+          await wait(40);
+          const name = (h4.firstChild ? h4.firstChild.textContent : h4.textContent).trim();
+          const rolls = readRolls();
+          if (name && rolls.length) {
+            items.push({ uid: tile.dataset.uid, name, n: rolls.length, score: rolls.reduce((a, r) => a + r.pos, 0), ratio: rolls.reduce((a, r) => a + r.p, 0), locked: !!tile.querySelector(".lk") });
+          }
+        }
+        closeModalBtn();
+        await wait(60);
+      }
+      const groups = {};
+      items.forEach((it) => (groups[it.name] = groups[it.name] || []).push(it));
+      const dup = Object.keys(groups).filter((k) => groups[k].length >= 2);
+      if (!dup.length) return "đã xét " + items.length + " món HK: không có nhóm nào từ 2 món cùng tên trở lên";
+      const pick = dup.map((k) => {
+        const g = groups[k].slice().sort((a, b) => b.score - a.score || b.ratio - a.ratio);
+        return { name: k, count: g.length, best: g[0], second: g[1] };
+      });
+      const pc = (it) => Math.round((it.score / it.n) * 100) + "%"; // điểm trung bình mỗi dòng
+      const label = (p) => p.name + " (" + p.count + " món → tốt nhất " + pc(p.best) + "/dòng" + (p.second ? ", món thứ hai " + pc(p.second) : "") + ")";
+      if (dry) return "đã xét " + items.length + " món HK, " + pick.length + " nhóm trùng: " + pick.slice(0, 8).map(label).join("; ") + (pick.length > 8 ? " … +" + (pick.length - 8) + " nhóm" : "");
+      // Lượt 2: cất món tốt nhất của từng nhóm
+      let moved = 0, stop = "";
+      const done = [];
+      for (const p of pick) {
+        if (stop) break;
+        const tile = qa("#t-inv .invgrid .it.r4").find((el) => el.dataset.uid === p.best.uid);
+        if (!tile) continue;
+        tile.click();
+        const btn = await waitFor(() => q("#bStashIt"), 2000);
+        if (!btn) { closeModalBtn(); await wait(60); continue; }
+        btn.click();
+        await waitFor(() => !tile.isConnected || /đầy|lỗi/i.test(toastOn()), 2500);
+        if (!tile.isConnected) { moved++; done.push(label(p)); }
+        else {
+          const t = toastOn();
+          if (/đầy/i.test(t)) stop = t; // Rương Chứa Đồ hết chỗ: dừng
+          closeModalBtn();
+        }
+        await wait(60);
+      }
+      return "đã cất " + moved + "/" + pick.length + " món tốt nhất vào Rương Chứa Đồ (xét " + items.length + " món HK)" + (stop ? " · dừng: " + stop : "") + (done.length ? " → " + done.slice(0, 6).join("; ") + (done.length > 6 ? " … +" + (done.length - 6) + " nhóm" : "") : "");
     } finally {
       petUi = false;
       closeModalBtn();
@@ -1055,8 +1130,8 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false) };
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
