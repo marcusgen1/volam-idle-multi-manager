@@ -142,7 +142,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   - Gửi: mở Hộp thư, gửi **toàn bộ KNB** đang có cho nhân vật ở ô "Gửi KNB cho nhân vật" (không kèm đồ, không phải thư giao dịch). Chỉ dùng được với tài khoản online.
 - **Check HK max** (🔍) và **Cất HK max** (🗄), có ở mục Tất cả và cả trên thanh nút của từng khung (dùng chung hai ô ngưỡng ở menu trái): lọc đồ Hoàng Kim có dòng thuộc tính **max hoặc gần max** rồi cất vào **Rương Chứa Đồ**.
   Chi tiết món Hoàng Kim liệt kê từng dòng, dòng có giá trị ngẫu nhiên kèm khoảng `[min ~ max]` (ví dụ `Sinh lực tối đa: +112 điểm [80 ~ 120]`). Script mở chi tiết từng món Hoàng Kim trong thẻ Hành trang,
-  tính tỉ lệ `(giá trị − min) / (max − min)` cho mỗi dòng có khoảng. Hai ô trên nút: **ngưỡng %** (mặc định 90: dòng nằm trong 10% cuối của khoảng; 100 = đúng max) và **số dòng tối thiểu** (mặc định 1).
+  tính tỉ lệ **giá trị / max** cho mỗi dòng có khoảng (ví dụ `+11% [8 ~ 12]` = 92%, `+24% [15 ~ 25]` = 96%; khoảng có số âm thì tính theo vị trí trong khoảng). Hai ô trên nút: **ngưỡng %** (mặc định 90; 100 = đúng max) và **số dòng tối thiểu** (mặc định 1).
   Món có đủ số dòng đạt ngưỡng thì tính là đạt. **Check** chỉ liệt kê món đạt ở dòng trạng thái (kèm số dòng đạt / dòng đúng max), không cất gì; **Cất** (hỏi xác nhận) bấm nút [Cất rương] của chi tiết món
   (cất được cả món đang khóa 🔒, bỏ qua ô 📜 giữ cho Dã Tẩu, không đụng đồ đang mặc) và dừng khi Rương Chứa Đồ đầy. Lấy lại ở 📦 Rương Chứa Đồ của game. Dòng không có khoảng (chỉ số cố định) không được tính.
 - **Mở rương ngựa** (🐎, mục Tất cả): mở hết Rương Ngựa đang có. Trước hết mở rương trong "túi vật phẩm" của Hành trang bằng nút **Dùng ×N** của game

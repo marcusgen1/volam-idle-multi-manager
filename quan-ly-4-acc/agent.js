@@ -894,7 +894,8 @@
 
   // Lọc đồ Hoàng Kim "max / gần max" rồi cất vào Rương Chứa Đồ. Chi tiết món (bấm ô trong thẻ Hành trang) liệt kê từng dòng thuộc tính, dòng nào có
   // giá trị ngẫu nhiên thì kèm khoảng [min ~ max], ví dụ "Sinh lực tối đa: +112 điểm [80 ~ 120]". Mỗi dòng có khoảng được tính tỉ lệ
-  // (giá trị − min) / (max − min); từ ngưỡng % trở lên là "gần max" (100% = đúng max). Món có ít nhất N dòng như vậy thì cất vào rương
+  // giá trị / max (+11% [8 ~ 12] = 92%); từ ngưỡng % trở lên là "gần max" (100% = đúng max). Khoảng có số âm thì tính theo vị trí
+  // trong khoảng (giá trị − min) / (max − min). Món có ít nhất N dòng như vậy thì cất vào rương
   // bằng nút [Cất rương] của chi tiết món (cất được cả món đang khóa 🔒). Bỏ qua ô 📜 giữ cho Dã Tẩu. Chế độ kiểm tra chỉ liệt kê, không cất.
   const HK_RNG = /\[\s*([-+−]?\d+(?:[.,]\d+)?)\s*[~–—-]\s*([-+−]?\d+(?:[.,]\d+)?)\s*\]/;
   const numF = (t) => parseFloat(String(t).replace("−", "-").replace(",", "."));
@@ -912,7 +913,7 @@
       const nums = all.slice(0, all.lastIndexOf(rng.textContent)).match(/[-+−]?\d+(?:[.,]\d+)?/g);
       if (!nums) return;
       const v = numF(nums[nums.length - 1]);
-      out.push({ text: all.replace(/\s+/g, " ").trim(), v, lo, hi, p: Math.max(0, Math.min(1, (v - lo) / (hi - lo))) });
+      out.push({ text: all.replace(/\s+/g, " ").trim(), v, lo, hi, p: Math.max(0, Math.min(1, lo >= 0 ? v / hi : (v - lo) / (hi - lo))) });
     });
     return out;
   }
@@ -947,7 +948,7 @@
         if (!rolls.length) noRoll++;
         const good = rolls.filter((r) => r.p * 100 >= pct - 1e-9);
         if (good.length >= minLines) {
-          const rec = { name, n: good.length, max: good.filter((r) => r.p >= 1).length, moved: false };
+          const rec = { name, n: good.length, max: good.filter((r) => r.p >= 1).length, pcts: good.map((r) => Math.round(r.p * 100) + "%"), moved: false };
           hit.push(rec);
           if (!dry) {
             const btn = q("#bStashIt");
@@ -969,7 +970,7 @@
         await wait(60);
       }
       const tag = "≥" + pct + "%" + (minLines > 1 ? " từ " + minLines + " dòng" : "");
-      const show = hit.slice(0, 8).map((r) => r.name + " (" + r.n + " dòng" + (r.max ? ", " + r.max + " max" : "") + (r.err ? " – " + r.err : "") + ")").join("; ");
+      const show = hit.slice(0, 8).map((r) => r.name + " (" + r.n + " dòng " + r.pcts.join("/") + (r.max ? ", " + r.max + " max" : "") + (r.err ? " – " + r.err : "") + ")").join("; ");
       const rest = hit.length > 8 ? " … +" + (hit.length - 8) + " món" : "";
       if (dry) return "đã kiểm tra " + seen + " món HK: " + hit.length + " món đạt " + tag + (show ? " → " + show + rest : "") + (noRoll ? " · " + noRoll + " món không có dòng [min ~ max] để so" : "");
       const moved = hit.filter((r) => r.moved).length;
