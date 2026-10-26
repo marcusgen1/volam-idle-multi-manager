@@ -34,6 +34,11 @@ for (const k of Object.keys(process.env)) {
   const m = k.match(/^VL_PROXY_(\d+)$/); // hoặc đặt bằng biến môi trường, ví dụ: VL_PROXY_5=socks5://host:port
   if (m && process.env[k]) proxyCfg[m[1]] = process.env[k];
 }
+// Tình trạng thực tế của proxy từng khung, ghi lại từ lưu lượng thật (trang quản lý đọc để hiện trạng thái)
+const proxyStat = {};
+const statOf = (slot) => (proxyStat[slot] = proxyStat[slot] || {});
+const pxOk = (slot) => { if (proxyCfg[slot]) statOf(slot).okAt = Date.now(); };
+const pxErr = (slot, e) => { if (proxyCfg[slot]) Object.assign(statOf(slot), { errAt: Date.now(), err: String((e && e.message) || e) }); };
 const proxyAgents = new Map();
 const proxyUrlOf = (slot) => (proxyCfg[slot] ? String(proxyCfg[slot]) : "");
 function agentFor(slot) {
@@ -81,10 +86,12 @@ function pxForward(req, res, slot) {
   if (headers.origin) headers.origin = "https://" + TARGET_HOST;
   if (headers.referer) headers.referer = "https://" + TARGET_HOST + "/";
   const up = https.request({ host: t.host, port: t.port, method: req.method, path: t.path, headers, agent: agentFor(slot) }, (ur) => {
+    pxOk(slot);
     res.writeHead(ur.statusCode, ur.headers);
     ur.pipe(res);
   });
   up.on("error", (e) => {
+    pxErr(slot, e);
     if (!res.headersSent) res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
     res.end("Lỗi proxy: " + e.message);
   });
@@ -97,6 +104,7 @@ function pxUpgrade(req, sock, head, slot) {
   if (!t) return sock.destroy();
   (t.secure ? openTls : openTunnel)(proxyUrlOf(slot), t.host, t.port).then(
     (up) => {
+      pxOk(slot);
       let raw = "GET " + t.path + " HTTP/1.1\r\n";
       for (let i = 0; i < req.rawHeaders.length; i += 2) {
         const k = req.rawHeaders[i], lk = k.toLowerCase();
@@ -112,7 +120,7 @@ function pxUpgrade(req, sock, head, slot) {
       const end = () => { up.destroy(); sock.destroy(); };
       up.on("error", end); sock.on("error", end); up.on("close", end); sock.on("close", end);
     },
-    () => sock.destroy()
+    (e) => { pxErr(slot, e); sock.destroy(); }
   );
 }
 
@@ -139,6 +147,7 @@ function proxy(req, res, port) {
   const up = https.request(
     { host: TARGET_HOST, port: 443, method: req.method, path: req.url, headers, agent: agentFor(slot) },
     (ur) => {
+      pxOk(slot);
       const h = Object.assign({}, ur.headers);
       if (h.location) {
         h.location = h.location.replace("https://" + TARGET_HOST, "http://" + BIND + ":" + port);
@@ -164,6 +173,7 @@ function proxy(req, res, port) {
     }
   );
   up.on("error", (e) => {
+    pxErr(slot, e);
     if (!res.headersSent) res.writeHead(502, { "content-type": "text/plain; charset=utf-8" });
     res.end("Không kết nối được tới game: " + e.message);
   });
@@ -277,24 +287,27 @@ function proxyList() {
   return out;
 }
 
+// Trả { ip, ms }: IP máy chủ game thấy và thời gian cả chuyến (gồm nối proxy + TLS)
 const traceIp = (ag) =>
   new Promise((resolve, reject) => {
+    const t0 = Date.now();
     const r = https.request({ host: TARGET_HOST, path: "/cdn-cgi/trace", agent: ag, timeout: 20000 }, (ur) => {
       let b = "";
       ur.on("data", (c) => (b += c));
-      ur.on("end", () => resolve((b.match(/^ip=(.+)$/m) || [])[1] || "?"));
+      ur.on("end", () => resolve({ ip: (b.match(/^ip=(.+)$/m) || [])[1] || "?", ms: Date.now() - t0 }));
     });
     r.on("timeout", () => r.destroy(new Error("Hết thời gian chờ")));
     r.on("error", reject);
     r.end();
   });
 
+let directIp = { ip: "", at: 0 };
 function proxyApi(req, res, url) {
   const send = (code, obj) => {
     res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
     res.end(JSON.stringify(obj));
   };
-  if (req.method === "GET") return send(200, { slots: proxyList() });
+  if (req.method === "GET") return send(200, { slots: proxyList(), stat: proxyStat });
   if (req.method !== "POST" || !trusted(req)) return send(403, { error: "forbidden" });
   readBody(req).then(async (b) => {
     const slot = parseInt(b.slot, 10);
@@ -302,9 +315,13 @@ function proxyApi(req, res, url) {
     if (url === "/__proxy/test") {
       if (!proxyUrlOf(slot)) return send(200, { error: "Khung này chưa đặt proxy" });
       try {
-        const [direct, viaProxy] = await Promise.all([traceIp(agent), traceIp(agentFor(slot))]);
-        return send(200, { direct, proxy: viaProxy });
+        // IP máy ít đổi nên giữ 10 phút, mỗi lần kiểm tra chỉ đi qua proxy
+        if (!directIp.ip || Date.now() - directIp.at > 10 * 60 * 1000) directIp = { ip: (await traceIp(agent)).ip, at: Date.now() };
+        const r = await traceIp(agentFor(slot));
+        pxOk(slot);
+        return send(200, { direct: directIp.ip, proxy: r.ip, ms: r.ms });
       } catch (e) {
+        pxErr(slot, e);
         return send(200, { error: e.message });
       }
     }
@@ -314,6 +331,7 @@ function proxyApi(req, res, url) {
       try { parseProxy(u); } catch (e) { return send(400, { error: e.message }); }
       proxyCfg[slot] = u;
     } else delete proxyCfg[slot];
+    delete proxyStat[slot]; // đổi proxy thì bỏ tình trạng cũ
     try {
       fs.writeFileSync(PROXY_FILE, JSON.stringify(proxyCfg, null, 2), { mode: 0o600 });
     } catch (e) {

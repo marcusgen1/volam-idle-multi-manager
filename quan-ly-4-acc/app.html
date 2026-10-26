@@ -37,6 +37,8 @@
   .bar { display:flex; align-items:center; gap:6px; padding:3px 6px; border-bottom:1px solid var(--line); }
   .num { flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#1a1a10; font-weight:700; text-align:center; line-height:20px; font-size:12px; }
   .bar .label { flex:1; min-width:0; color:var(--text); font-weight:600; padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pxst { flex:none; font-size:11px; color:var(--dim); cursor:pointer; white-space:nowrap; max-width:48%; overflow:hidden; text-overflow:ellipsis; }
+  .pxst.ok { color:#5fd38d; } .pxst.bad { color:#ef6b6b; } .pxst.warn { color:#e0b341; }
   .bar .label small { color:var(--dim); font-weight:400; }
   .modes { display:flex; align-items:center; gap:3px; padding:2px 5px; border-bottom:1px solid var(--line); flex-wrap: wrap; }
   .modes button.sm { padding:1px 5px; line-height:1.5; }
@@ -308,6 +310,7 @@
     slot.innerHTML =
       '<div class="bar"><span class="num"></span>' +
       '<span class="label"></span>' +
+      '<span class="pxst" hidden></span>' +
       '<button class="sm" data-a="px">🌐</button>' +
       '<button class="sm" data-a="reload" title="Tải lại khung này">⟳</button>' +
       '<button class="sm" data-a="max" title="Phóng to / thu nhỏ">⛶</button>' +
@@ -347,6 +350,7 @@
     slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); };
     slot.querySelector('[data-a="del"]').onclick = () => removeSlot(c);
     slot.querySelector('[data-a="px"]').onclick = () => setPx(idx());
+    slot.querySelector(".pxst").onclick = () => pxCheck(state.slots[idx()].p);
     mount(els.length - 1, s.on);
     renderPx();
     return c;
@@ -359,11 +363,51 @@
     els.forEach((c, i) => {
       const b = c.slot.querySelector('[data-a="px"]');
       b.hidden = state.slots[i].p !== PX_PORT;
+      pxRenderStatus(c.slot.querySelector(".pxst"), state.slots[i].p);
       const u = pxList[state.slots[i].p];
       b.classList.toggle("on", !!u);
       b.title = u ? "Đang dùng proxy " + u + " (bấm để đổi / tắt)" : "Đặt proxy riêng cho khung này để đổi IP (khung chạy ở cổng " + (BASE_PORT + state.slots[i].p) + ")";
     });
   }
+  // Trạng thái kết nối proxy của khung 5: kết quả lần kiểm tra gần nhất (qua proxy tới game) + lỗi thật ghi nhận từ lưu lượng game
+  let pxTest = {}, pxStat = {};
+  const pxSec = (ms) => (ms / 1000).toFixed(1).replace(".", ",") + "s";
+  function pxRenderStatus(el, p) {
+    el.hidden = p !== PX_PORT;
+    if (el.hidden) return;
+    const u = pxList[p], t = pxTest[p], st = pxStat[p] || {}, now = Date.now();
+    let cls = "", txt, tip;
+    if (!u) { txt = "○ chưa đặt proxy"; tip = "Khung này đang dùng IP máy. Bấm 🌐 để đặt proxy."; }
+    else if (st.errAt && st.errAt > (st.okAt || 0) && now - st.errAt < 120000) {
+      cls = "bad"; txt = "● proxy lỗi"; tip = "Lỗi khi game chạy qua proxy " + u + ": " + st.err + " (bấm để kiểm tra lại)";
+    } else if (!t) { txt = "◌ đang kiểm tra…"; tip = u; }
+    else if (t.error) { cls = "bad"; txt = "● không kết nối"; tip = "Proxy " + u + ": " + t.error + " (bấm để kiểm tra lại)"; }
+    else if (t.proxy === t.direct) { cls = "warn"; txt = "● IP trùng máy"; tip = "Qua proxy " + u + " nhưng game vẫn thấy IP máy (" + t.proxy + ") — proxy chưa đổi được IP (bấm để kiểm tra lại)"; }
+    else { cls = "ok"; txt = "● " + t.proxy + " · " + pxSec(t.ms); tip = "Proxy " + u + " hoạt động: game thấy IP " + t.proxy + " (IP máy " + t.direct + "), phản hồi " + pxSec(t.ms) + ". Kiểm tra lúc " + new Date(t.at).toLocaleTimeString() + " (bấm để kiểm tra lại)"; }
+    el.className = "pxst" + (cls ? " " + cls : "");
+    el.textContent = txt;
+    el.title = tip;
+  }
+  async function pxCheck(p) {
+    if (!pxList[p]) { delete pxTest[p]; renderPx(); return; }
+    delete pxTest[p];
+    renderPx();
+    try {
+      pxTest[p] = Object.assign(await pxPost("/__proxy/test", { slot: p }), { at: Date.now() });
+    } catch (e) {
+      pxTest[p] = { error: e.message, at: Date.now() };
+    }
+    await pxPoll();
+  }
+  async function pxPoll() {
+    try {
+      const r = await fetch("/__proxy", { cache: "no-store" });
+      if (r.ok) { const j = await r.json(); pxList = j.slots || {}; pxStat = j.stat || {}; }
+    } catch (e) {}
+    renderPx();
+  }
+  setInterval(pxPoll, 10000); // lấy lỗi thật từ lưu lượng game
+  setInterval(() => { if (state.slots.some((s) => s.p === PX_PORT && s.on)) pxCheck(PX_PORT); }, 60000);
   async function pxPost(path, body) {
     const r = await fetch(path, { method: "POST", headers: { "x-vl": "1", "content-type": "application/json" }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({}));
@@ -385,9 +429,12 @@
       const j = await pxPost("/__proxy", { slot: p, url: v.trim() });
       pxList = j.slots || {};
       renderPx();
-      if (!v.trim()) logToast("Proxy", "Khung " + (i + 1) + ": đã tắt proxy (dùng IP máy này)");
+      if (!v.trim()) { delete pxTest[p]; renderPx(); logToast("Proxy", "Khung " + (i + 1) + ": đã tắt proxy (dùng IP máy này)"); }
       else {
         const t = await pxPost("/__proxy/test", { slot: p });
+        pxTest[p] = Object.assign({}, t, { at: Date.now() });
+        pxStat = {};
+        renderPx();
         if (t.error) logToast("Proxy", "Khung " + (i + 1) + ": đã lưu nhưng kiểm tra lỗi — " + t.error);
         else if (t.proxy === t.direct) logToast("Proxy", "Khung " + (i + 1) + ": IP qua proxy " + t.proxy + " GIỐNG IP máy này — proxy chưa đổi được IP");
         else logToast("Proxy", "Khung " + (i + 1) + ": IP máy " + t.direct + " → IP qua proxy " + t.proxy);
@@ -452,6 +499,7 @@
   }
 
   state.slots.forEach(createSlot);
+  if (pxList[PX_PORT]) pxCheck(PX_PORT);
 
   // ----- Nút điều khiển cho tất cả khung -----
   const allBox = document.getElementById("allModes");
