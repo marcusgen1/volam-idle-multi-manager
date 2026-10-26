@@ -136,6 +136,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Tự dừng khi đủ Thú điển hoặc khi các loài còn thiếu đều ở bãi chưa mở. Nút "tất cả" bật / tắt cho mọi khung; nút 🐾 ở từng khung bật / tắt riêng.
   Chọn chế độ khác (Nhiệm Vụ, Phó Bản…) thì Bắt thú của khung đó tắt. Chọn bãi làm game tắt "Tự đổi theo cấp". Khung tải lại thì tự bật lại nếu đang bật.
 - **Đổi lượng → KNB** (💱) và **Gửi hết KNB** (📨), chỉ có ở mục Tất cả (đều hỏi xác nhận, không hoàn tác):
+  - **Ba nút Đổi lượng → KNB, Gửi hết KNB và Gửi đồ Hoàng Kim bỏ qua khung 5** (khung chạy ở cổng 8805, thường là nhân vật nhận / giữ đồ); hộp xác nận ghi rõ "(trừ khung 5)".
   - Đổi: mở Kỳ Trân Các và bấm mua KNB (1 KNB = 10 vạn lượng, giới hạn mỗi ngày — hiện 5.000) cho tới khi ngân lượng chỉ còn **số vạn lượng ở ô "Giữ lại"** (mặc định 500).
     Số ngân lượng lấy từ bản lưu của game (cũ tới ~10 giây nên chỉ đổi ít hơn chứ không đổi quá). Game không cho đổi ngược KNB → lượng. Kỳ Trân Các có hai bảng, script tự chuyển sang "💰 Bảng Kim Nguyên Bảo". KNB khóa không gửi thư được nên không tính vào "Gửi hết KNB".
   - Gửi: mở Hộp thư, gửi **toàn bộ KNB** đang có cho nhân vật ở ô "Gửi KNB cho nhân vật" (không kèm đồ, không phải thư giao dịch). Chỉ dùng được với tài khoản online.
@@ -172,6 +173,10 @@ rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để
 - Với khung có proxy, **cả trang game lẫn mọi kết nối game gọi ra `*.volamidle.net`** (đăng nhập, dữ liệu, WebSocket) đều đi qua proxy, nên máy chủ game thấy IP của proxy.
   Cách làm: `px-shim.js` được chèn vào khung đó, đổi các lời gọi `fetch` / `XMLHttpRequest` / `WebSocket` tới `*.volamidle.net` thành gọi về cổng của khung, máy chủ cục bộ chuyển tiếp qua proxy.
   Chỉ máy chủ của game được phép đi qua đường này (thêm tên miền khác bằng `VL_PX_ALLOW=ten-mien.com`).
+- **Hộp chọn proxy**: bấm 🌐 mở danh sách proxy chọn sẵn (cờ nước · proxy · độ trễ). Khi mở, app tự kiểm tra từng proxy qua chính game (sống / chết, IP + nước game thấy, thời gian phản hồi),
+  xếp cái sống và nhanh lên đầu; bấm một dòng để dùng ngay (tự kiểm tra IP rồi tải lại khung 5). **✎ Nhập tay…** để dán proxy khác, **⏻ Tắt proxy** để về IP máy, **⟳ Kiểm tra lại** để thử lại cả danh sách.
+  Danh sách nằm ở `quan-ly-4-acc/proxy-presets.json` (khoảng 10 proxy công cộng HK / SG / JP / VN, chọn từ nhiều lần quét vì nhanh và còn sống; **proxy miễn phí chết rất nhanh**, cái nào ✗ chết thì sửa file hoặc thêm cái mới).
+  Proxy riêng của bạn (có user/pass, ví dụ Webshare) đặt trong `quan-ly-4-acc/proxy-presets.local.json` (cùng dạng `[{ "url": "http://user:pass@host:port", "country": "US" }]`, **không đưa lên GitHub**), nó được gộp vào cùng hộp chọn và mật khẩu không hiện ra trang.
 - **Trạng thái kết nối** hiện ngay cạnh nút 🌐 của khung 5: `● <IP game thấy> · <thời gian phản hồi>` (xanh) khi proxy chạy tốt; `● IP trùng máy` (vàng) khi proxy chưa đổi được IP;
   `● không kết nối` / `● proxy lỗi` (đỏ) khi kiểm tra thất bại hoặc game vừa gặp lỗi qua proxy; `○ chưa đặt proxy` khi khung dùng IP máy. Rê chuột vào để xem chi tiết (proxy, IP máy, giờ kiểm tra, nội dung lỗi), bấm vào để kiểm tra lại ngay.
   App tự kiểm tra mỗi 60 giây (một yêu cầu nhỏ qua proxy) và đọc lỗi thật từ lưu lượng game mỗi 10 giây.

@@ -37,6 +37,18 @@
   .bar { display:flex; align-items:center; gap:6px; padding:3px 6px; border-bottom:1px solid var(--line); }
   .num { flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#1a1a10; font-weight:700; text-align:center; line-height:20px; font-size:12px; }
   .bar .label { flex:1; min-width:0; color:var(--text); font-weight:600; padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #pxDlg { background:var(--panel); color:var(--text); border:1px solid var(--accent); border-radius:8px; padding:10px; width:min(520px,94vw); }
+  #pxDlg::backdrop { background:rgba(0,0,0,.6); }
+  #pxDlg .hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  #pxDlg .cur { font-size:12px; color:var(--dim); margin-bottom:6px; word-break:break-all; }
+  #pxDlg .rows { display:flex; flex-direction:column; gap:3px; max-height:52vh; overflow-y:auto; }
+  #pxDlg .pxrow { display:flex; align-items:center; gap:8px; text-align:left; padding:4px 8px; }
+  #pxDlg .pxrow.on { background:#2b3d34; border-color:var(--accent); }
+  #pxDlg .pxrow.dead { opacity:.5; }
+  #pxDlg .pxrow .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+  #pxDlg .pxrow .ms { flex:none; font-size:12px; color:var(--dim); }
+  #pxDlg .pxrow .ms.ok { color:#5fd38d; } #pxDlg .pxrow .ms.warn { color:#e0b341; } #pxDlg .pxrow .ms.bad { color:#ef6b6b; }
+  #pxDlg .ft { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
   .pxst { flex:none; font-size:11px; color:var(--dim); cursor:pointer; white-space:nowrap; max-width:48%; overflow:hidden; text-overflow:ellipsis; }
   .slot { container-type:inline-size; }
   @container (max-width: 460px) { .pxst .ip { display:none; } } /* khung hẹp (5 cột): chỉ giữ chấm trạng thái + độ trễ, IP xem ở tooltip để còn chỗ cho tên */
@@ -445,22 +457,14 @@
     if (!r.ok) throw new Error(j.error || "lỗi " + r.status);
     return j;
   }
-  async function setPx(i) {
+  // Áp dụng proxy cho khung i: body = { url } (nhập tay, để trống = tắt) hoặc { preset: id } (chọn từ danh sách)
+  async function applyPx(i, body) {
     const p = state.slots[i].p;
-    const v = prompt(
-      "Proxy cho khung " + (i + 1) + " (cổng " + (BASE_PORT + p) + ").\n" +
-      "Dạng: http://user:pass@host:port  hoặc  socks5://user:pass@host:port\n" +
-      "(Proxy MTProto của Telegram — Server / Port / Secret — không dùng được cho game.)\n" +
-      (pxList[p] ? "Đang dùng: " + pxList[p] + "\n" : "") +
-      "Để trống = tắt proxy cho khung này.",
-      ""
-    );
-    if (v === null) return;
     try {
-      const j = await pxPost("/__proxy", { slot: p, url: v.trim() });
+      const j = await pxPost("/__proxy", Object.assign({ slot: p }, body));
       pxList = j.slots || {};
       renderPx();
-      if (!v.trim()) { delete pxTest[p]; renderPx(); logToast("Proxy", "Khung " + (i + 1) + ": đã tắt proxy (dùng IP máy này)"); }
+      if (!pxList[p]) { delete pxTest[p]; renderPx(); logToast("Proxy", "Khung " + (i + 1) + ": đã tắt proxy (dùng IP máy này)"); }
       else {
         const t = await pxPost("/__proxy/test", { slot: p });
         pxTest[p] = Object.assign({}, t, { at: Date.now() });
@@ -474,6 +478,84 @@
     } catch (e) {
       logToast("Proxy", "Khung " + (i + 1) + ": " + e.message);
     }
+  }
+  function manualPx(i) {
+    const p = state.slots[i].p;
+    const v = prompt(
+      "Proxy cho khung " + (i + 1) + " (cổng " + (BASE_PORT + p) + ").\n" +
+      "Dạng: http://user:pass@host:port  hoặc  socks5://user:pass@host:port\n" +
+      "(Proxy MTProto của Telegram — Server / Port / Secret — không dùng được cho game.)\n" +
+      (pxList[p] ? "Đang dùng: " + pxList[p] + "\n" : "") +
+      "Để trống = tắt proxy cho khung này.",
+      ""
+    );
+    if (v !== null) applyPx(i, { url: v.trim() });
+  }
+
+  // Hộp chọn proxy: danh sách chọn sẵn (proxy-presets.json + proxy-presets.local.json), tự kiểm tra sống / độ trễ khi mở
+  const flag = (cc) => (/^[A-Z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)) : "🌐");
+  const pxDlg = document.createElement("dialog");
+  pxDlg.id = "pxDlg";
+  pxDlg.innerHTML =
+    '<div class="hd"><b class="ttl"></b><button class="sm" data-x="close" title="Đóng">✕</button></div>' +
+    '<div class="cur"></div><div class="rows"></div>' +
+    '<div class="ft"><button class="sm" data-x="test">⟳ Kiểm tra lại</button><button class="sm" data-x="manual">✎ Nhập tay…</button><button class="sm" data-x="off">⏻ Tắt proxy</button></div>';
+  document.body.appendChild(pxDlg);
+  let pxDlgSlot = -1, pxPresets = [], pxRes = {};
+  const dq = (x) => pxDlg.querySelector(x);
+  function pxRenderRows() {
+    const p = pxDlgSlot >= 0 ? state.slots[pxDlgSlot].p : 0;
+    dq(".cur").textContent = pxList[p] ? "Đang dùng: " + pxList[p] : "Đang dùng IP máy này (chưa đặt proxy)";
+    const order = pxPresets.slice().sort((a, b) => {
+      const ra = pxRes[a.id], rb = pxRes[b.id];
+      const ka = !ra ? 1 : ra.ok ? 0 : 2, kb = !rb ? 1 : rb.ok ? 0 : 2; // sống trước, chưa kiểm tra giữa, chết cuối
+      return ka - kb || (ka === 0 ? ra.ms - rb.ms : a.id - b.id);
+    });
+    const rows = dq(".rows");
+    rows.textContent = "";
+    if (!order.length) rows.textContent = "Chưa có proxy chọn sẵn (thêm vào proxy-presets.json).";
+    order.forEach((q) => {
+      const r = pxRes[q.id];
+      const b = document.createElement("button");
+      b.className = "pxrow" + (pxList[p] === q.label ? " on" : "") + (r && !r.ok ? " dead" : "");
+      const f = document.createElement("span"); f.className = "fl"; f.textContent = flag(q.country);
+      const n = document.createElement("span"); n.className = "nm"; n.textContent = (q.country ? q.country + " · " : "") + q.label + (q.note ? "  (" + q.note + ")" : "");
+      const m = document.createElement("span"); m.className = "ms";
+      if (!r) m.textContent = "…";
+      else if (!r.ok) { m.textContent = "✗ chết"; b.title = r.error; }
+      else { m.textContent = pxSec(r.ms); m.classList.add(r.ms < 1000 ? "ok" : r.ms < 3000 ? "warn" : "bad"); b.title = "Game thấy IP " + r.ip + (r.loc ? " (" + r.loc + ")" : ""); }
+      b.append(f, n, m);
+      b.onclick = () => { const i = pxDlgSlot; pxDlg.close(); applyPx(i, { preset: q.id }); };
+      rows.appendChild(b);
+    });
+  }
+  async function pxTestAll() {
+    pxRes = {};
+    pxRenderRows();
+    try {
+      const j = await pxPost("/__proxy/presets/test", {});
+      (j.results || []).forEach((r) => (pxRes[r.id] = r));
+    } catch (e) {}
+    if (pxDlg.open) pxRenderRows();
+  }
+  pxDlg.onclick = (e) => {
+    const x = e.target.closest("[data-x]");
+    if (e.target === pxDlg || (x && x.dataset.x === "close")) return pxDlg.close();
+    if (!x) return;
+    const i = pxDlgSlot;
+    if (x.dataset.x === "test") pxTestAll();
+    else if (x.dataset.x === "manual") { pxDlg.close(); manualPx(i); }
+    else if (x.dataset.x === "off") { pxDlg.close(); applyPx(i, { url: "" }); }
+  };
+  async function setPx(i) {
+    pxDlgSlot = i;
+    dq(".ttl").textContent = "Proxy cho khung " + (i + 1) + " (cổng " + (BASE_PORT + state.slots[i].p) + ")";
+    try {
+      const r = await fetch("/__proxy/presets", { cache: "no-store" });
+      pxPresets = r.ok ? (await r.json()).presets || [] : [];
+    } catch (e) { pxPresets = []; }
+    pxDlg.showModal();
+    pxTestAll();
   }
 
   function addSlot() {
@@ -682,16 +764,18 @@
     return e;
   };
   const activeSlots = () => state.slots.map((s, i) => (s.on ? i : -1)).filter((i) => i >= 0);
+  // Đổi lượng → KNB, Gửi hết KNB, Gửi đồ Hoàng Kim: bỏ qua khung 5 (khung chạy ở cổng 8805, thường là nhân vật nhận / giữ đồ)
+  const moneySlots = () => activeSlots().filter((i) => state.slots[i].p !== PX_PORT);
   if (state.keepVan == null) state.keepVan = 500;
   allBox.appendChild(labelEl("Giữ lại (vạn lượng):"));
   allBox.appendChild(inputEl("number", state.keepVan, "500", (v) => { state.keepVan = Math.max(0, Math.floor(+v || 0)); save(); }));
   const doiBtn = document.createElement("button");
   doiBtn.textContent = "💱 Đổi lượng → KNB";
-  doiBtn.title = "Tất cả nhân vật: đổi hết ngân lượng thành Kim Nguyên Bảo ở Kỳ Trân Các (1 KNB = 10 vạn lượng, có giới hạn mỗi ngày), giữ lại tối thiểu số vạn lượng ở ô trên";
+  doiBtn.title = "Tất cả nhân vật (trừ khung 5): đổi hết ngân lượng thành Kim Nguyên Bảo ở Kỳ Trân Các (1 KNB = 10 vạn lượng, có giới hạn mỗi ngày), giữ lại tối thiểu số vạn lượng ở ô trên";
   doiBtn.onclick = () => {
-    const idxs = activeSlots();
+    const idxs = moneySlots();
     const keep = Math.max(0, Math.floor(+state.keepVan || 0));
-    if (idxs.length && confirm("Đổi ngân lượng thành KNB ở " + idxs.length + " khung đang bật, giữ lại tối thiểu " + keep.toLocaleString("vi-VN") + " vạn lượng?\n\nKNB không đổi ngược lại thành lượng được. Không hoàn tác.")) {
+    if (idxs.length && confirm("Đổi ngân lượng thành KNB ở " + idxs.length + " khung đang bật (trừ khung 5), giữ lại tối thiểu " + keep.toLocaleString("vi-VN") + " vạn lượng?\n\nKNB không đổi ngược lại thành lượng được. Không hoàn tác.")) {
       idxs.forEach((i) => post(i, { type: "pd", kind: "doi", keep }));
     }
   };
@@ -700,24 +784,24 @@
   allBox.appendChild(inputEl("text", state.knbTo || "", "Tên nhân vật nhận", (v) => { state.knbTo = v.trim(); save(); }));
   const guiKnbBtn = document.createElement("button");
   guiKnbBtn.textContent = "📨 Gửi hết KNB";
-  guiKnbBtn.title = "Tất cả nhân vật: gửi hết Kim Nguyên Bảo đang có cho nhân vật ở ô trên bằng thư (KNB khóa không gửi được)";
+  guiKnbBtn.title = "Tất cả nhân vật (trừ khung 5): gửi hết Kim Nguyên Bảo đang có cho nhân vật ở ô trên bằng thư (KNB khóa không gửi được)";
   guiKnbBtn.onclick = () => {
-    const idxs = activeSlots();
+    const idxs = moneySlots();
     const to = String(state.knbTo || "").trim();
     if (!to) { alert("Nhập tên nhân vật nhận ở ô phía trên nút."); return; }
-    if (idxs.length && confirm("Gửi HẾT Kim Nguyên Bảo của " + idxs.length + " khung đang bật cho nhân vật \"" + to + "\" qua thư?\n\nThư đã gửi không thể thu hồi.")) {
+    if (idxs.length && confirm("Gửi HẾT Kim Nguyên Bảo của " + idxs.length + " khung đang bật (trừ khung 5) cho nhân vật \"" + to + "\" qua thư?\n\nThư đã gửi không thể thu hồi.")) {
       idxs.forEach((i) => post(i, { type: "pd", kind: "knb", to }));
     }
   };
   allBox.appendChild(guiKnbBtn);
   const guiHkBtn = document.createElement("button");
   guiHkBtn.textContent = "📨 Gửi đồ Hoàng Kim";
-  guiHkBtn.title = "Tất cả nhân vật: gửi hết đồ Hoàng Kim trong hành trang cho nhân vật ở ô trên bằng thư (tối đa 10 món / thư; gồm cả món đã khóa 🔒; bỏ đồ đang mặc, đồ Bạch Kim và đồ giữ cho Dã Tẩu)";
+  guiHkBtn.title = "Tất cả nhân vật (trừ khung 5): gửi hết đồ Hoàng Kim trong hành trang cho nhân vật ở ô trên bằng thư (tối đa 10 món / thư; gồm cả món đã khóa 🔒; bỏ đồ đang mặc, đồ Bạch Kim và đồ giữ cho Dã Tẩu)";
   guiHkBtn.onclick = () => {
-    const idxs = activeSlots();
+    const idxs = moneySlots();
     const to = String(state.knbTo || "").trim();
     if (!to) { alert("Nhập tên nhân vật nhận ở ô phía trên nút."); return; }
-    if (idxs.length && confirm("Gửi HẾT đồ Hoàng Kim trong hành trang của " + idxs.length + " khung đang bật cho nhân vật \"" + to + "\" qua thư?\n\nGồm cả món đã khóa 🔒 (game cho gửi thư món khóa). Đồ đang mặc, đồ Bạch Kim và đồ giữ cho Dã Tẩu được giữ lại. Thư đã gửi không thể thu hồi.")) {
+    if (idxs.length && confirm("Gửi HẾT đồ Hoàng Kim trong hành trang của " + idxs.length + " khung đang bật (trừ khung 5) cho nhân vật \"" + to + "\" qua thư?\n\nGồm cả món đã khóa 🔒 (game cho gửi thư món khóa). Đồ đang mặc, đồ Bạch Kim và đồ giữ cho Dã Tẩu được giữ lại. Thư đã gửi không thể thu hồi.")) {
       idxs.forEach((i) => post(i, { type: "pd", kind: "hk", to }));
     }
   };
