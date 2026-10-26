@@ -807,6 +807,35 @@
   };
   allBox.appendChild(guiHkBtn);
 
+  // Lọc đồ Hoàng Kim "max / gần max" (dòng thuộc tính có khoảng [min ~ max]) rồi cất vào Rương Chứa Đồ
+  if (state.hkPct == null) state.hkPct = 90;
+  if (state.hkLines == null) state.hkLines = 1;
+  allBox.appendChild(labelEl("Cất HK max: ngưỡng % khoảng · số dòng tối thiểu:"));
+  const hkRow = document.createElement("div");
+  hkRow.style.cssText = "display:flex;gap:4px";
+  const hkPctIn = inputEl("number", state.hkPct, "90", (v) => { state.hkPct = Math.max(1, Math.min(100, Math.floor(+v || 90))); hkPctIn.value = state.hkPct; save(); });
+  const hkLinesIn = inputEl("number", state.hkLines, "1", (v) => { state.hkLines = Math.max(1, Math.min(9, Math.floor(+v || 1))); hkLinesIn.value = state.hkLines; save(); });
+  [hkPctIn, hkLinesIn].forEach((e) => { e.min = "1"; e.step = "1"; e.style.minWidth = "0"; hkRow.appendChild(e); });
+  hkPctIn.title = "Ngưỡng: dòng có giá trị đạt từ ngần này % của khoảng [min ~ max] (100 = đúng max, 90 = trong 10% cuối của khoảng)";
+  hkLinesIn.title = "Món phải có ít nhất ngần này dòng đạt ngưỡng mới tính";
+  allBox.appendChild(hkRow);
+  const hkMsg = (i, kind) => post(i, { type: "pd", kind, pct: state.hkPct, lines: state.hkLines });
+  const hkChkBtn = document.createElement("button");
+  hkChkBtn.textContent = "🔍 Check HK max";
+  hkChkBtn.title = "Tất cả nhân vật: xem đồ Hoàng Kim trong hành trang món nào có dòng max / gần max (theo ngưỡng ở trên). Chỉ liệt kê ở dòng trạng thái, không cất gì.";
+  hkChkBtn.onclick = () => activeSlots().forEach((i) => hkMsg(i, "hkchk"));
+  allBox.appendChild(hkChkBtn);
+  const hkCatBtn = document.createElement("button");
+  hkCatBtn.textContent = "🗄 Cất HK max";
+  hkCatBtn.title = "Tất cả nhân vật: cất vào Rương Chứa Đồ những món Hoàng Kim trong hành trang có ít nhất N dòng đạt ngưỡng % của khoảng [min ~ max] (cả món đang khóa 🔒; bỏ qua ô 📜 giữ cho Dã Tẩu). Lấy ra lại ở 📦 Rương Chứa Đồ.";
+  hkCatBtn.onclick = () => {
+    const idxs = activeSlots();
+    if (idxs.length && confirm("Cất vào Rương Chứa Đồ các món Hoàng Kim có ít nhất " + state.hkLines + " dòng đạt từ " + state.hkPct + "% khoảng [min ~ max], ở " + idxs.length + " khung đang bật?\n\nChưa chắc món nào đạt: bấm Check HK max trước để xem. Lấy lại được ở 📦 Rương Chứa Đồ.")) {
+      idxs.forEach((i) => hkMsg(i, "hkcat"));
+    }
+  };
+  allBox.appendChild(hkCatBtn);
+
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
   const lRow = document.getElementById("lRow");
