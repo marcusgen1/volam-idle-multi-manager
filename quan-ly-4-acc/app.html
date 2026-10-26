@@ -89,7 +89,7 @@
 <aside id="side">
   <h1 id="title">Quản lý nhân vật</h1>
   <div class="grp">
-    <button id="lGrid" title="Chia lưới (4 khung = 2×2; 5 khung: 5 cột khi Luyện Công / Leo Tháp, 3 trên + 2 dưới khi Nhiệm Vụ / Phó Bản)">Lưới</button>
+    <button id="lGrid" title="Chia lưới, các khung đều nằm ngang (4 khung = 2×2; 5 khung = 3 trên + 2 dưới)">Lưới</button>
     <button id="lRow" title="Tất cả khung cạnh nhau trong một hàng">1 hàng</button>
     <button id="addSlot" title="Thêm một khung game mới">＋ Thêm khung</button>
   </div>
@@ -206,7 +206,6 @@
     state.slots[i].desired = mode;
     if (mode !== "farm") state.slots[i].pet = false; // chọn chế độ khác thì dừng Bắt thú (agent cũng tự dừng)
     save();
-    applyLayout();
     refresh(i);
     if (state.slots[i].on) {
       ensureGrid(mode);
@@ -264,6 +263,7 @@
       f.src = frameUrl(i);
       c.frame.appendChild(f);
       c.iframe = f;
+      fitFrame(c);
     } else {
       const d = document.createElement("div");
       d.className = "off";
@@ -302,11 +302,28 @@
       if (m.sync && m.desired !== state.slots[i].desired) {
         state.slots[i].desired = m.desired;
         save();
-        applyLayout();
       }
       refresh(i);
     }
   });
+
+  // Game chỉ vẽ trọn bố cục ngang khi khung rộng từ ~640px; hẹp hơn thì chừa một dải đen bên phải. Ô lưới hẹp hơn mức đó (ví dụ 3 khung
+  // trên của lưới 5 khung) thì cho game chạy ở bề rộng tối thiểu rồi thu nhỏ vừa ô. Chỉ áp dụng cho ô nằm ngang; bố cục 1 hàng (khung dọc) giữ nguyên.
+  const GAME_MIN_W = 650;
+  function fitFrame(c) {
+    const f = c.iframe;
+    if (!f) return;
+    const w = c.frame.clientWidth, h = c.frame.clientHeight;
+    if (state.layout !== "row" && w > 0 && w < GAME_MIN_W && w >= h * 0.9) {
+      const k = w / GAME_MIN_W;
+      f.style.width = GAME_MIN_W + "px";
+      f.style.height = h / k + "px";
+      f.style.transformOrigin = "0 0";
+      f.style.transform = "scale(" + k + ")";
+    } else {
+      f.style.width = f.style.height = f.style.transform = f.style.transformOrigin = "";
+    }
+  }
 
   // ----- Tạo / xóa khung -----
   function createSlot(s) {
@@ -352,10 +369,11 @@
     slot.querySelector("[data-pdh]").onclick = () => sendPd(idx(), "hb");
     slot.querySelector('[data-a="reload"]').onclick = () => { const i = idx(); if (state.slots[i].on) mount(i, true); };
     slot.querySelector('[data-a="max"]').onclick = () => { const i = idx(); maxed = maxed === i ? -1 : i; applyLayout(); };
-    slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); applyLayout(); };
+    slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); };
     slot.querySelector('[data-a="del"]').onclick = () => removeSlot(c);
     slot.querySelector('[data-a="px"]').onclick = () => setPx(idx());
     slot.querySelector(".pxst").onclick = () => pxCheck(state.slots[idx()].p);
+    new ResizeObserver(() => fitFrame(c)).observe(c.frame);
     mount(els.length - 1, s.on);
     renderPx();
     return c;
@@ -708,15 +726,12 @@
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
   const lRow = document.getElementById("lRow");
-  // Khung rộng (ngang) là bố cục game dành cho Nhiệm Vụ / Phó Bản; khung cao (dọc) thì game dùng hết chiều rộng, không chừa vùng đen bên phải
-  function wideGrid() { return state.slots.some((s) => s.on && needsGrid(s.desired)); }
   function applyLayout() {
     const n = els.length;
     main.className = maxed >= 0 ? "max" : "";
     let cols, rows;
     if (maxed >= 0) { cols = 1; rows = 1; }
     else if (state.layout === "row") { cols = n; rows = 1; }
-    else if (n === 5 && !wideGrid() && main.clientWidth / 5 >= 300) { cols = 5; rows = 1; }
     else if (n === 5) { cols = 6; rows = 2; } // 3 khung trên + 2 khung dưới (mỗi khung dưới rộng 3/6): không bỏ trống ô nào
     else { cols = Math.min(n, Math.ceil(Math.sqrt(n))); rows = Math.ceil(n / cols); } // 4 khung = 2×2, 6 khung = 3×2, 9 khung = 3×3
     main.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
@@ -726,7 +741,6 @@
     lGrid.classList.toggle("on", state.layout !== "row");
     lRow.classList.toggle("on", state.layout === "row");
   }
-  window.addEventListener("resize", () => { if (els.length === 5) applyLayout(); }); // 5 khung: số cột phụ thuộc bề rộng
   lGrid.onclick = () => { state.layout = "grid"; maxed = -1; save(); applyLayout(); };
   lRow.onclick = () => { state.layout = "row"; maxed = -1; save(); applyLayout(); };
   document.getElementById("addSlot").onclick = addSlot;
