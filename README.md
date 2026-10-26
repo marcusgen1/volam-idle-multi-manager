@@ -162,14 +162,14 @@ Mật khẩu **không** được lưu trong trang này; hãy dùng "Nhớ tài k
 
 ## Proxy riêng cho từng khung (đổi IP)
 
-Nút **🌐** ở thanh tiêu đề mỗi khung: dán proxy dạng `http://user:pass@host:port` hoặc `socks5://user:pass@host:port` (bỏ `user:pass@` nếu proxy không cần đăng nhập).
+Nút **🌐** ở thanh tiêu đề của **khung thứ 5** (khung chạy ở cổng 8805; các khung 1–4 không có nút này và luôn dùng IP máy): dán proxy dạng `http://user:pass@host:port` hoặc `socks5://user:pass@host:port` (bỏ `user:pass@` nếu proxy không cần đăng nhập).
 Máy chủ lưu vào `quan-ly-4-acc/proxy.json` (không đưa lên GitHub; cũng đặt được bằng biến môi trường `VL_PROXY_5=socks5://host:port`), kiểm tra bằng cách so IP máy với IP qua proxy,
 rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để trống ô nhập để tắt.
 
 - Với khung có proxy, **cả trang game lẫn mọi kết nối game gọi ra `*.volamidle.net`** (đăng nhập, dữ liệu, WebSocket) đều đi qua proxy, nên máy chủ game thấy IP của proxy.
   Cách làm: `px-shim.js` được chèn vào khung đó, đổi các lời gọi `fetch` / `XMLHttpRequest` / `WebSocket` tới `*.volamidle.net` thành gọi về cổng của khung, máy chủ cục bộ chuyển tiếp qua proxy.
   Chỉ máy chủ của game được phép đi qua đường này (thêm tên miền khác bằng `VL_PX_ALLOW=ten-mien.com`).
-- Các khung không đặt proxy chạy như cũ. Proxy gắn với **cổng** của khung (khung dùng cổng 8805 thì proxy đặt cho cổng 8805), không gắn với vị trí hiển thị.
+- Các khung 1–4 chạy như cũ. Proxy gắn với **cổng** của khung (cổng 8805), không gắn với vị trí hiển thị: xóa khung 1–4 rồi thêm lại không làm khung 5 mất proxy. Khung 5 là khung được thêm sau cùng khi 4 khung đầu còn đủ.
 - **Proxy MTProto của Telegram (Server / Port / Secret) không dùng được**: nó chỉ chạy cho ứng dụng Telegram. Cần proxy HTTP/HTTPS hoặc SOCKS5.
 - Thư viện chống bot của game (nếu bật) và font / ảnh từ CDN vẫn tải trực tiếp từ máy bạn. Nếu proxy hỏng, khung đó không tải được game (không tự quay về IP máy để tránh lộ IP thật).
 

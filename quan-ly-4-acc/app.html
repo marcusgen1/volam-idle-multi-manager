@@ -353,9 +353,12 @@
   }
 
   // ----- Proxy riêng cho khung (đổi IP) -----
+  // Chỉ khung chạy ở cổng số 5 (BASE_PORT + 5) có nút 🌐; các khung 1–4 luôn dùng IP máy này.
+  const PX_PORT = 5;
   function renderPx() {
     els.forEach((c, i) => {
       const b = c.slot.querySelector('[data-a="px"]');
+      b.hidden = state.slots[i].p !== PX_PORT;
       const u = pxList[state.slots[i].p];
       b.classList.toggle("on", !!u);
       b.title = u ? "Đang dùng proxy " + u + " (bấm để đổi / tắt)" : "Đặt proxy riêng cho khung này để đổi IP (khung chạy ở cổng " + (BASE_PORT + state.slots[i].p) + ")";
