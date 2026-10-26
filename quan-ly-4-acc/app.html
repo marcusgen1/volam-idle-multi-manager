@@ -38,6 +38,8 @@
   .num { flex:none; width:20px; height:20px; border-radius:50%; background:var(--accent); color:#1a1a10; font-weight:700; text-align:center; line-height:20px; font-size:12px; }
   .bar .label { flex:1; min-width:0; color:var(--text); font-weight:600; padding:2px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .pxst { flex:none; font-size:11px; color:var(--dim); cursor:pointer; white-space:nowrap; max-width:48%; overflow:hidden; text-overflow:ellipsis; }
+  .slot { container-type:inline-size; }
+  @container (max-width: 460px) { .pxst .ip { display:none; } } /* khung hẹp (5 cột): chỉ giữ chấm trạng thái + độ trễ, IP xem ở tooltip để còn chỗ cho tên */
   .pxst.ok { color:#5fd38d; } .pxst.bad { color:#ef6b6b; } .pxst.warn { color:#e0b341; }
   .bar .label small { color:var(--dim); font-weight:400; }
   .modes { display:flex; align-items:center; gap:3px; padding:2px 5px; border-bottom:1px solid var(--line); flex-wrap: wrap; }
@@ -77,6 +79,7 @@
     .grp { flex-direction: row; flex-wrap: wrap; align-items: center; }
     .sep { width: 1px; height: auto; align-self: stretch; margin: 0 2px; }
     main { grid-template-columns:1fr !important; grid-template-rows:none !important; overflow-y:auto; }
+    main .slot { grid-column:auto !important; }
     .slot { height:80vh; }
   }
 </style>
@@ -86,7 +89,7 @@
 <aside id="side">
   <h1 id="title">Quản lý nhân vật</h1>
   <div class="grp">
-    <button id="lGrid" title="Chia lưới (4 khung = 2×2)">Lưới</button>
+    <button id="lGrid" title="Chia lưới (4 khung = 2×2; 5 khung: 5 cột khi Luyện Công / Leo Tháp, 3 trên + 2 dưới khi Nhiệm Vụ / Phó Bản)">Lưới</button>
     <button id="lRow" title="Tất cả khung cạnh nhau trong một hàng">1 hàng</button>
     <button id="addSlot" title="Thêm một khung game mới">＋ Thêm khung</button>
   </div>
@@ -203,6 +206,7 @@
     state.slots[i].desired = mode;
     if (mode !== "farm") state.slots[i].pet = false; // chọn chế độ khác thì dừng Bắt thú (agent cũng tự dừng)
     save();
+    applyLayout();
     refresh(i);
     if (state.slots[i].on) {
       ensureGrid(mode);
@@ -298,6 +302,7 @@
       if (m.sync && m.desired !== state.slots[i].desired) {
         state.slots[i].desired = m.desired;
         save();
+        applyLayout();
       }
       refresh(i);
     }
@@ -347,7 +352,7 @@
     slot.querySelector("[data-pdh]").onclick = () => sendPd(idx(), "hb");
     slot.querySelector('[data-a="reload"]').onclick = () => { const i = idx(); if (state.slots[i].on) mount(i, true); };
     slot.querySelector('[data-a="max"]').onclick = () => { const i = idx(); maxed = maxed === i ? -1 : i; applyLayout(); };
-    slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); };
+    slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); applyLayout(); };
     slot.querySelector('[data-a="del"]').onclick = () => removeSlot(c);
     slot.querySelector('[data-a="px"]').onclick = () => setPx(idx());
     slot.querySelector(".pxst").onclick = () => pxCheck(state.slots[idx()].p);
@@ -383,9 +388,17 @@
     } else if (!t) { txt = "◌ đang kiểm tra…"; tip = u; }
     else if (t.error) { cls = "bad"; txt = "● không kết nối"; tip = "Proxy " + u + ": " + t.error + " (bấm để kiểm tra lại)"; }
     else if (t.proxy === t.direct) { cls = "warn"; txt = "● IP trùng máy"; tip = "Qua proxy " + u + " nhưng game vẫn thấy IP máy (" + t.proxy + ") — proxy chưa đổi được IP (bấm để kiểm tra lại)"; }
-    else { cls = "ok"; txt = "● " + t.proxy + " · " + pxSec(t.ms); tip = "Proxy " + u + " hoạt động: game thấy IP " + t.proxy + " (IP máy " + t.direct + "), phản hồi " + pxSec(t.ms) + ". Kiểm tra lúc " + new Date(t.at).toLocaleTimeString() + " (bấm để kiểm tra lại)"; }
+    else { cls = "ok"; txt = ["● ", t.proxy, pxSec(t.ms)]; tip = "Proxy " + u + " hoạt động: game thấy IP " + t.proxy + " (IP máy " + t.direct + "), phản hồi " + pxSec(t.ms) + ". Kiểm tra lúc " + new Date(t.at).toLocaleTimeString() + " (bấm để kiểm tra lại)"; }
     el.className = "pxst" + (cls ? " " + cls : "");
-    el.textContent = txt;
+    el.textContent = "";
+    if (Array.isArray(txt)) {
+      el.appendChild(document.createTextNode(txt[0]));
+      const ip = document.createElement("span");
+      ip.className = "ip";
+      ip.textContent = txt[1] + " · ";
+      el.appendChild(ip);
+      el.appendChild(document.createTextNode(txt[2]));
+    } else el.textContent = txt;
     el.title = tip;
   }
   async function pxCheck(p) {
@@ -695,19 +708,25 @@
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
   const lRow = document.getElementById("lRow");
+  // Khung rộng (ngang) là bố cục game dành cho Nhiệm Vụ / Phó Bản; khung cao (dọc) thì game dùng hết chiều rộng, không chừa vùng đen bên phải
+  function wideGrid() { return state.slots.some((s) => s.on && needsGrid(s.desired)); }
   function applyLayout() {
     const n = els.length;
     main.className = maxed >= 0 ? "max" : "";
     let cols, rows;
     if (maxed >= 0) { cols = 1; rows = 1; }
     else if (state.layout === "row") { cols = n; rows = 1; }
+    else if (n === 5 && !wideGrid() && main.clientWidth / 5 >= 300) { cols = 5; rows = 1; }
+    else if (n === 5) { cols = 6; rows = 2; } // 3 khung trên + 2 khung dưới (mỗi khung dưới rộng 3/6): không bỏ trống ô nào
     else { cols = Math.min(n, Math.ceil(Math.sqrt(n))); rows = Math.ceil(n / cols); } // 4 khung = 2×2, 6 khung = 3×2, 9 khung = 3×3
     main.style.gridTemplateColumns = "repeat(" + cols + ", 1fr)";
     main.style.gridTemplateRows = "repeat(" + rows + ", 1fr)";
+    els.forEach((c, i) => { c.slot.style.gridColumn = maxed < 0 && cols === 6 ? (i < 3 ? "span 2" : "span 3") : ""; });
     els.forEach((c, i) => c.slot.classList.toggle("maxed", i === maxed));
     lGrid.classList.toggle("on", state.layout !== "row");
     lRow.classList.toggle("on", state.layout === "row");
   }
+  window.addEventListener("resize", () => { if (els.length === 5) applyLayout(); }); // 5 khung: số cột phụ thuộc bề rộng
   lGrid.onclick = () => { state.layout = "grid"; maxed = -1; save(); applyLayout(); };
   lRow.onclick = () => { state.layout = "row"; maxed = -1; save(); applyLayout(); };
   document.getElementById("addSlot").onclick = addSlot;
