@@ -157,10 +157,9 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Dòng nhật ký chỉ có khi khung thông báo của game ở tab **Hệ thống**: lần đầu sau khi tải khung script tự bấm sang tab đó một lần.
 - Bố cục 2×2 hoặc 4 cột, phóng to / tắt từng khung. **Dùng bố cục 2×2 khi chạy Nhiệm Vụ**: ở 4 cột game không vẽ khung
   "Nhiệm vụ Theo Dấu" nên script không đọc được tiến độ. Vì vậy khi chọn Nhiệm Vụ, Phó Bản hoặc Chạy PB + NV mà đang ở bố cục 1 hàng, trang tự chuyển về lưới.
-- **Bố cục lưới với 5 khung**: game dùng bố cục *ngang* khi khung rộng hơn cao (chừa một dải đen bên phải) và bố cục *dọc* (dùng hết bề rộng) khi khung cao hơn rộng.
-  Vì vậy lưới 5 khung tự đổi theo việc đang chạy: **Luyện Công / Leo Tháp / chế độ khác** → 5 cột × 1 hàng (khung cao, game lấp đầy, không còn ô trống);
-  **Nhiệm Vụ / Phó Bản / Chạy PB + NV** → 3 khung trên + 2 khung dưới (mỗi khung dưới rộng hơn, không bỏ trống ô nào), đủ rộng để game vẽ khung Theo Dấu.
-  Màn hình hẹp (mỗi cột dưới 300px) thì luôn dùng 3 + 2. Lưới 1–4 khung và nút **1 hàng** giữ như cũ.
+- **Bố cục lưới (nút Lưới)**: mọi khung đều nằm ngang, không bỏ trống ô nào. 4 khung = 2×2, **5 khung = 3 khung trên + 2 khung dưới** (mỗi khung dưới rộng hơn).
+  Game chỉ vẽ trọn bố cục ngang khi khung rộng từ khoảng 640px (hẹp hơn thì chừa dải đen bên phải), nên ô lưới hẹp hơn mức đó (ví dụ 3 khung trên của lưới 5 khung) được chạy ở bề rộng 650px
+  rồi tự thu nhỏ vừa ô (khoảng 0,88×). Nút **1 hàng** (các khung đứng cạnh nhau, dọc) giữ nguyên, không thu nhỏ.
 
 Mật khẩu **không** được lưu trong trang này; hãy dùng "Nhớ tài khoản" của game và trình quản lý mật khẩu của Chrome.
 
