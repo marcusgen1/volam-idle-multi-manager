@@ -362,6 +362,8 @@
       '<button class="sm" data-pdu title="Dùng bình PD: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
       '<button class="sm" data-pdh title="Mở hồng bao: mở hết Hồng Bao và Đại Hồng Bao đang có (lượng / Kim Nguyên Bảo ngẫu nhiên)" aria-label="Mở hồng bao">🧧</button>' +
       '<button class="sm" data-pdo title="Mở hết PD: mở hết rương Phúc Duyên trong Phần thưởng (mỗi rương 10 điểm)" aria-label="Mở hết rương Phúc Duyên">🎁</button>' +
+      '<button class="sm" data-hkc title="Check HK max: xem đồ Hoàng Kim nào có dòng max / gần max (theo ngưỡng ở menu bên trái), chỉ liệt kê" aria-label="Check HK max">🔍</button>' +
+      '<button class="sm" data-hkm title="Cất HK max: cất vào Rương Chứa Đồ các món Hoàng Kim đạt ngưỡng ở menu bên trái (hỏi xác nhận)" aria-label="Cất HK max">🗄</button>' +
       '<span class="st"></span></div>' +
       '<div class="frame"></div>';
     main.appendChild(slot);
@@ -378,6 +380,8 @@
     slot.querySelector("[data-pdd]").onclick = () => sendPd(idx(), "dong");
     slot.querySelector("[data-pdu]").onclick = () => sendPd(idx(), "dung");
     slot.querySelector("[data-pdo]").onclick = () => sendPd(idx(), "mo");
+    slot.querySelector("[data-hkc]").onclick = () => hkMsg(idx(), "hkchk");
+    slot.querySelector("[data-hkm]").onclick = () => { const i = idx(); if (confirmHkCat([i])) hkMsg(i, "hkcat"); };
     slot.querySelector("[data-pdh]").onclick = () => sendPd(idx(), "hb");
     slot.querySelector('[data-a="reload"]').onclick = () => { const i = idx(); if (state.slots[i].on) mount(i, true); };
     slot.querySelector('[data-a="max"]').onclick = () => { const i = idx(); maxed = maxed === i ? -1 : i; applyLayout(); };
@@ -819,6 +823,7 @@
   hkPctIn.title = "Ngưỡng: dòng có giá trị đạt từ ngần này % của khoảng [min ~ max] (100 = đúng max, 90 = trong 10% cuối của khoảng)";
   hkLinesIn.title = "Món phải có ít nhất ngần này dòng đạt ngưỡng mới tính";
   allBox.appendChild(hkRow);
+  const confirmHkCat = (idxs) => confirm("Cất vào Rương Chứa Đồ các món Hoàng Kim có ít nhất " + state.hkLines + " dòng đạt từ " + state.hkPct + "% khoảng [min ~ max], ở " + (idxs.length === 1 ? "khung " + (idxs[0] + 1) : idxs.length + " khung đang bật") + "?\n\nChưa chắc món nào đạt: bấm Check HK max trước để xem. Lấy lại được ở 📦 Rương Chứa Đồ.");
   const hkMsg = (i, kind) => post(i, { type: "pd", kind, pct: state.hkPct, lines: state.hkLines });
   const hkChkBtn = document.createElement("button");
   hkChkBtn.textContent = "🔍 Check HK max";
@@ -830,9 +835,7 @@
   hkCatBtn.title = "Tất cả nhân vật: cất vào Rương Chứa Đồ những món Hoàng Kim trong hành trang có ít nhất N dòng đạt ngưỡng % của khoảng [min ~ max] (cả món đang khóa 🔒; bỏ qua ô 📜 giữ cho Dã Tẩu). Lấy ra lại ở 📦 Rương Chứa Đồ.";
   hkCatBtn.onclick = () => {
     const idxs = activeSlots();
-    if (idxs.length && confirm("Cất vào Rương Chứa Đồ các món Hoàng Kim có ít nhất " + state.hkLines + " dòng đạt từ " + state.hkPct + "% khoảng [min ~ max], ở " + idxs.length + " khung đang bật?\n\nChưa chắc món nào đạt: bấm Check HK max trước để xem. Lấy lại được ở 📦 Rương Chứa Đồ.")) {
-      idxs.forEach((i) => hkMsg(i, "hkcat"));
-    }
+    if (idxs.length && confirmHkCat(idxs)) idxs.forEach((i) => hkMsg(i, "hkcat"));
   };
   allBox.appendChild(hkCatBtn);
 
