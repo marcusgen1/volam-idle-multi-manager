@@ -136,7 +136,7 @@
     const sv = ready ? readSave() : null; // số liệu thật từ bản lưu của game (không phụ thuộc việc khung có đang được vẽ)
     const ok = ready && charLoaded(); // không có bản lưu thì đọc chữ trên thanh trên, nhưng chỉ khi đã vào nhân vật (trước đó là số mặc định: cấp 1, 0 lượng)
     if (sv && sv.name) heroName = sv.name;
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, petOn: petRun, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, petOn: petRun, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", black: ready && readBlack(), sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -1659,6 +1659,10 @@
       if (autoSell) autoSellTick().catch(() => {}); // kiểm tra ngay khi vừa bật, không phải chờ 30 giây
       return;
     }
+    if (m && m.vl === 1 && m.type === "black") {
+      setBlack(!!m.on);
+      return;
+    }
     if (m && m.vl === 1 && m.type === "pd") {
       if (PD_RUN[m.kind]) runPd(m.kind, m);
       return;
@@ -1788,6 +1792,26 @@
       restoreTab(prev);
     }
     return out;
+  };
+  // Màn hình đen: tùy chọn "Màn hình đen" ở Hệ thống > Hiển Thị của game (ngừng vẽ, game vẫn chạy). Game nhớ lựa chọn trong localStorage "jxidle_ui".
+  // Ô tích chỉ có trong trang khi thẻ Hệ thống đã được nạp, nên mở thẻ đó một lần chạy (trả lại thẻ cũ ngay) rồi tích / bỏ tích như bạn vẫn làm.
+  const readBlack = () => {
+    try {
+      return !!JSON.parse(localStorage.getItem("jxidle_ui") || "{}").black;
+    } catch (e) {
+      return false;
+    }
+  };
+  const setBlack = (on) => {
+    if (readBlack() === on) return;
+    readFromTab("more", () => {
+      const cb = q("#uBlack");
+      if (cb && cb.checked !== on) {
+        cb.checked = on;
+        cb.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    });
+    report(true);
   };
   const peekHeroName = () => {
     heroAt = Date.now();
