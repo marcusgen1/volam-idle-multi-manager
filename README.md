@@ -149,6 +149,9 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Gửi đồ Hoàng Kim** (📨, mục Tất cả, dùng chung ô tên người nhận với Gửi hết KNB; hỏi xác nhận, không hoàn tác): mở Hộp thư rồi gửi mọi món
   Hoàng Kim trong hành trang (ô có lớp `r4`), mỗi thư tối đa 10 món (giới hạn của game) và lặp tới khi hết. **Gồm cả món đã khóa 🔒** (game cho gửi thư món khóa; khóa chỉ chặn
   tự bán / bán Chợ). Giữ lại: ô 📜 (giữ cho Dã Tẩu), đồ đang mặc và đồ Bạch Kim. Gửi bằng thư thường (không phải thư giao dịch). Không thấy món nào thì báo kèm các độ hiếm đang có trong hành trang.
+- **Màn hình đen** (🌑 ở cuối cột trái, cạnh Tải lại): bật / tắt tùy chọn "Màn hình đen" của game (Hệ thống > Hiển Thị: ngừng vẽ, game vẫn chạy, nhẹ máy nhất khi treo)
+  cho mọi khung đang bật. Nút hiện BẬT khi có khung đang đen; bấm vào khung đen để bật lại riêng khung đó (nút tự cập nhật). Game tự nhớ lựa chọn
+  trong `localStorage` của khung (khóa `jxidle_ui`) nên tải lại khung vẫn giữ nguyên. Agent mở thẻ Hệ thống một lần chạy để tích ô `#uBlack` rồi trả lại thẻ cũ.
 - **Nhật ký** (📒 ở đầu trang): bảng theo từng nhân vật gồm cấp tăng, số tầng tháp leo được, ngân lượng và Kim Nguyên Bảo kiếm / chi trong ngày (giờ Việt Nam),
   số liệu 14 ngày gần nhất và danh sách sự kiện đáng chú ý (đồ phổ, Thần Mã; đổi mẫu nhận diện ở
   `LOG_NOTABLE` trong `agent.js`); có sự kiện mới thì hiện thông báo nhỏ ở góc dưới phải. Số liệu lưu trong `localStorage` của trình duyệt.

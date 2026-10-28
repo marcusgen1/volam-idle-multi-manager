@@ -110,6 +110,7 @@
   <span class="grow"></span>
   <button id="updNow" title="Kiểm tra bản mới trên GitHub ngay (không cần chờ thông báo) và cập nhật nếu có">⬆ Cập nhật</button>
   <button id="logBtn" title="Nhật ký hoạt động của từng nhân vật: cấp tăng, ngân lượng kiếm được trong ngày, đồ đáng chú ý">📒 Nhật ký <small id="logBadge"></small></button>
+  <button id="blackBtn" title="Bật / tắt màn hình đen cho tất cả khung: game ngừng vẽ nhưng vẫn chạy, nhẹ máy nhất khi treo. Bấm vào khung đen để bật lại khung đó.">🌑 Màn hình đen: TẮT</button>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </aside>
 <div id="content">
@@ -304,7 +305,7 @@
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", goldN: m.goldN, knbN: m.knbN, tower: m.tower | 0 };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", goldN: m.goldN, knbN: m.knbN, tower: m.tower | 0, black: !!m.black };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pet", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
@@ -316,6 +317,7 @@
         save();
       }
       refresh(i);
+      renderBlack();
     }
   });
 
@@ -1136,6 +1138,19 @@
   document.getElementById("logPanel").onclick = (e) => { if (e.target.id === "logPanel") e.target.hidden = true; };
   setInterval(() => { if (!document.getElementById("logPanel").hidden) renderLog(); }, 5000);
 
+  // Màn hình đen cho cả các khung đang bật. Khung đã đen thì lần bấm sau tắt hết; game tự nhớ lựa chọn nên tải lại khung vẫn giữ.
+  const blackBtn = document.getElementById("blackBtn");
+  const anyBlack = () => state.slots.some((s, i) => s.on && live[i] && live[i].black);
+  function renderBlack() {
+    const on = anyBlack();
+    blackBtn.textContent = "🌑 Màn hình đen: " + (on ? "BẬT" : "TẮT");
+    blackBtn.classList.toggle("on", on);
+  }
+  blackBtn.onclick = () => {
+    const on = !anyBlack();
+    forOn((i) => post(i, { type: "black", on }));
+  };
+  renderBlack();
   document.getElementById("reloadAll").onclick = () => state.slots.forEach((s, i) => s.on && mount(i, true));
   afterCountChange();
 })();
