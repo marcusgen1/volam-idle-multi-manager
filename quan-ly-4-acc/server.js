@@ -330,6 +330,64 @@ async function testPresets(list) {
   return res;
 }
 
+const saveProxyCfg = () => fs.writeFileSync(PROXY_FILE, JSON.stringify(proxyCfg, null, 2), { mode: 0o600 });
+
+// --- Tự đổi proxy khi proxy chết ---
+// Cứ mỗi AUTO_TICK_MS kiểm tra proxy của từng khung có đặt proxy (bỏ qua nếu vừa có lưu lượng game đi qua thành công). Proxy không trả lời
+// AUTO_FAILS lần liên tiếp (mà mạng máy vẫn thông, tránh đổi oan khi mất mạng) thì thử cả danh sách chọn sẵn, đổi sang proxy sống nhanh nhất,
+// ưu tiên cùng nước với proxy cũ. Bật / tắt theo từng khung ở proxy-auto.json (mặc định bật). Chạy ở máy chủ nên không cần mở trang quản lý.
+const AUTO_FILE = path.join(__dirname, "proxy-auto.json");
+let proxyAuto = {};
+try { proxyAuto = JSON.parse(fs.readFileSync(AUTO_FILE, "utf8")) || {}; } catch {}
+const autoOn = (slot) => proxyAuto[slot] !== false;
+const AUTO_TICK_MS = 30000, AUTO_FAILS = 2, AUTO_RETRY_MS = 2 * 60000;
+const autoState = {};
+async function autoSwitch(slot, deadUrl) {
+  const st = autoState[slot];
+  const used = new Set(Object.keys(proxyCfg).filter((k) => +k !== slot).map((k) => proxyCfg[k]));
+  const all = loadPresets();
+  const cur = all.find((p) => p.url === deadUrl);
+  const list = all.filter((p) => p.url !== deadUrl && !used.has(p.url));
+  const res = await testPresets(list);
+  const alive = list.map((p, i) => ({ p, r: res[i] })).filter((x) => x.r && x.r.ok);
+  if (proxyUrlOf(slot) !== deadUrl) return; // trong lúc kiểm tra bạn đã tự đổi proxy: thôi
+  if (!alive.length) {
+    st.next = Date.now() + AUTO_RETRY_MS;
+    statOf(slot).autoMsg = "Proxy chết và chưa có proxy chọn sẵn nào sống (thử lại sau 2 phút)";
+    return;
+  }
+  const cc = cur && cur.country;
+  alive.sort((a, b) => (b.p.country === cc) - (a.p.country === cc) || a.r.ms - b.r.ms);
+  const pick = alive[0];
+  proxyCfg[slot] = pick.p.url;
+  try { saveProxyCfg(); } catch {}
+  const old = proxyAgents.get(deadUrl);
+  if (old) { old.destroy(); proxyAgents.delete(deadUrl); }
+  proxyStat[slot] = { okAt: Date.now(), sw: { at: Date.now(), from: describeProxy(deadUrl), to: pick.p.label, country: pick.p.country, ip: pick.r.ip, ms: pick.r.ms } };
+  st.fails = 0;
+  console.log("[proxy] khung " + slot + ": " + describeProxy(deadUrl) + " chết -> " + pick.p.label + " (IP " + pick.r.ip + ", " + pick.r.ms + "ms)");
+}
+async function autoWatch(slot) {
+  const st = (autoState[slot] = autoState[slot] || { fails: 0, busy: false, next: 0 });
+  if (!proxyUrlOf(slot) || !autoOn(slot)) { st.fails = 0; return; }
+  if (st.busy) return;
+  const s = statOf(slot);
+  if (s.okAt && Date.now() - s.okAt < AUTO_TICK_MS) { st.fails = 0; return; }
+  st.busy = true;
+  try {
+    const url = proxyUrlOf(slot);
+    try { await traceIp(agentFor(slot), 10000); pxOk(slot); st.fails = 0; delete s.autoMsg; return; } catch (e) { pxErr(slot, e); }
+    try { await traceIp(agent, 8000); } catch { return; } // IP máy cũng không ra được: mất mạng chứ không phải proxy chết
+    if (++st.fails < AUTO_FAILS || Date.now() < st.next) return;
+    await autoSwitch(slot, url);
+  } catch (e) {
+    console.log("[proxy] tự đổi proxy khung " + slot + " lỗi: " + e.message);
+  } finally {
+    st.busy = false;
+  }
+}
+setInterval(() => { for (const k of Object.keys(proxyCfg)) autoWatch(k).catch(() => {}); }, AUTO_TICK_MS).unref();
+
 let directIp = { ip: "", at: 0 };
 function proxyApi(req, res, url) {
   const send = (code, obj) => {
@@ -337,7 +395,7 @@ function proxyApi(req, res, url) {
     res.end(JSON.stringify(obj));
   };
   if (req.method === "GET" && url === "/__proxy/presets") return send(200, { presets: presetView(loadPresets()) });
-  if (req.method === "GET") return send(200, { slots: proxyList(), stat: proxyStat });
+  if (req.method === "GET") return send(200, { slots: proxyList(), stat: proxyStat, auto: Object.fromEntries(Object.keys(proxyList()).map((k) => [k, autoOn(k)])) });
   if (req.method !== "POST" || !trusted(req)) return send(403, { error: "forbidden" });
   readBody(req).then(async (b) => {
     if (url === "/__proxy/presets/test") return send(200, { results: await testPresets(loadPresets()) });
@@ -356,6 +414,12 @@ function proxyApi(req, res, url) {
         return send(200, { error: e.message });
       }
     }
+    if (url === "/__proxy/auto") {
+      proxyAuto[slot] = !!b.on;
+      try { fs.writeFileSync(AUTO_FILE, JSON.stringify(proxyAuto, null, 2)); } catch (e) { return send(500, { error: "Không lưu được proxy-auto.json: " + e.message }); }
+      if (autoState[slot]) autoState[slot].fails = 0;
+      return send(200, { on: autoOn(slot) });
+    }
     if (url !== "/__proxy") return send(404, { error: "not found" });
     let u = String(b.url || "").trim();
     if (b.preset != null) {
@@ -369,7 +433,7 @@ function proxyApi(req, res, url) {
     } else delete proxyCfg[slot];
     delete proxyStat[slot]; // đổi proxy thì bỏ tình trạng cũ
     try {
-      fs.writeFileSync(PROXY_FILE, JSON.stringify(proxyCfg, null, 2), { mode: 0o600 });
+      saveProxyCfg();
     } catch (e) {
       return send(500, { error: "Không lưu được proxy.json: " + e.message });
     }

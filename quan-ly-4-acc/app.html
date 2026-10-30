@@ -48,7 +48,8 @@
   #pxDlg .pxrow .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
   #pxDlg .pxrow .ms { flex:none; font-size:12px; color:var(--dim); }
   #pxDlg .pxrow .ms.ok { color:#5fd38d; } #pxDlg .pxrow .ms.warn { color:#e0b341; } #pxDlg .pxrow .ms.bad { color:#ef6b6b; }
-  #pxDlg .ft { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  #pxDlg .ft { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center; }
+  #pxDlg .auto { flex-basis:100%; font-size:12px; color:var(--dim); cursor:pointer; display:flex; align-items:center; gap:4px; }
   .pxst { flex:none; font-size:11px; color:var(--dim); cursor:pointer; white-space:nowrap; max-width:48%; overflow:hidden; text-overflow:ellipsis; }
   .slot { container-type:inline-size; }
   @container (max-width: 460px) { .pxst .ip { display:none; } } /* khung hẹp (5 cột): chỉ giữ chấm trạng thái + độ trễ, IP xem ở tooltip để còn chỗ cho tên */
@@ -407,7 +408,8 @@
     });
   }
   // Trạng thái kết nối proxy của khung 5: kết quả lần kiểm tra gần nhất (qua proxy tới game) + lỗi thật ghi nhận từ lưu lượng game
-  let pxTest = {}, pxStat = {};
+  let pxTest = {}, pxStat = {}, pxAuto = {};
+  const pxSeenSw = {}; // lần tự đổi proxy gần nhất đã báo cho bạn, theo khung (lúc mới mở trang tính cả các lần đổi trong 10 phút qua)
   const pxSec = (ms) => (ms / 1000).toFixed(1).replace(".", ",") + "s";
   function pxRenderStatus(el, p) {
     el.hidden = p !== PX_PORT;
@@ -416,11 +418,13 @@
     let cls = "", txt, tip;
     if (!u) { txt = "○ chưa đặt proxy"; tip = "Khung này đang dùng IP máy. Bấm 🌐 để đặt proxy."; }
     else if (st.errAt && st.errAt > (st.okAt || 0) && now - st.errAt < 120000) {
-      cls = "bad"; txt = "● proxy lỗi"; tip = "Lỗi khi game chạy qua proxy " + u + ": " + st.err + " (bấm để kiểm tra lại)";
+      cls = "bad"; txt = "● proxy lỗi"; tip = "Lỗi khi game chạy qua proxy " + u + ": " + st.err + " (bấm để kiểm tra lại)" +
+        (st.autoMsg ? "\n" + st.autoMsg : pxAuto[p] !== false ? "\nĐang tự tìm proxy khác nếu proxy này chết hẳn." : "");
     } else if (!t) { txt = "◌ đang kiểm tra…"; tip = u; }
     else if (t.error) { cls = "bad"; txt = "● không kết nối"; tip = "Proxy " + u + ": " + t.error + " (bấm để kiểm tra lại)"; }
     else if (t.proxy === t.direct) { cls = "warn"; txt = "● IP trùng máy"; tip = "Qua proxy " + u + " nhưng game vẫn thấy IP máy (" + t.proxy + ") — proxy chưa đổi được IP (bấm để kiểm tra lại)"; }
-    else { cls = "ok"; txt = ["● ", t.proxy, pxSec(t.ms)]; tip = "Proxy " + u + " hoạt động: game thấy IP " + t.proxy + " (IP máy " + t.direct + "), phản hồi " + pxSec(t.ms) + ". Kiểm tra lúc " + new Date(t.at).toLocaleTimeString() + " (bấm để kiểm tra lại)"; }
+    else { cls = "ok"; txt = ["● ", t.proxy, pxSec(t.ms)]; tip = "Proxy " + u + " hoạt động: game thấy IP " + t.proxy + " (IP máy " + t.direct + "), phản hồi " + pxSec(t.ms) + ". Kiểm tra lúc " + new Date(t.at).toLocaleTimeString() + " (bấm để kiểm tra lại)" +
+      (st.sw ? "\nĐã tự đổi proxy lúc " + new Date(st.sw.at).toLocaleTimeString() + ": " + st.sw.from + " chết → " + st.sw.to : ""); }
     el.className = "pxst" + (cls ? " " + cls : "");
     el.textContent = "";
     if (Array.isArray(txt)) {
@@ -447,8 +451,18 @@
   async function pxPoll() {
     try {
       const r = await fetch("/__proxy", { cache: "no-store" });
-      if (r.ok) { const j = await r.json(); pxList = j.slots || {}; pxStat = j.stat || {}; }
+      if (r.ok) { const j = await r.json(); pxList = j.slots || {}; pxStat = j.stat || {}; pxAuto = j.auto || {}; }
     } catch (e) {}
+    // Máy chủ vừa tự đổi proxy chết sang proxy khác: báo cho bạn và kiểm tra lại proxy mới
+    for (const [p, st] of Object.entries(pxStat)) {
+      const sw = st && st.sw;
+      if (!sw || sw.at <= (pxSeenSw[p] || Date.now() - 600000)) continue;
+      pxSeenSw[p] = sw.at;
+      const i = state.slots.findIndex((s) => String(s.p) === String(p));
+      logToast("Proxy", "Khung " + (i >= 0 ? i + 1 : p) + ": proxy " + sw.from + " chết → đã tự đổi sang " + sw.to + " (IP " + sw.ip + ", " + pxSec(sw.ms) + ")");
+      delete pxTest[p];
+      if (+p === PX_PORT) pxCheck(+p);
+    }
     renderPx();
   }
   setInterval(pxPoll, 10000); // lấy lỗi thật từ lưu lượng game
@@ -501,13 +515,15 @@
   pxDlg.innerHTML =
     '<div class="hd"><b class="ttl"></b><button class="sm" data-x="close" title="Đóng">✕</button></div>' +
     '<div class="cur"></div><div class="rows"></div>' +
-    '<div class="ft"><button class="sm" data-x="test">⟳ Kiểm tra lại</button><button class="sm" data-x="manual">✎ Nhập tay…</button><button class="sm" data-x="off">⏻ Tắt proxy</button></div>';
+    '<div class="ft"><button class="sm" data-x="test">⟳ Kiểm tra lại</button><button class="sm" data-x="manual">✎ Nhập tay…</button><button class="sm" data-x="off">⏻ Tắt proxy</button>' +
+    '<label class="auto" title="Khi proxy không trả lời (và mạng máy vẫn thông), máy chủ tự kiểm tra danh sách chọn sẵn và đổi sang proxy sống nhanh nhất, ưu tiên cùng nước. Chạy cả khi bạn không mở trang quản lý."><input type="checkbox" data-x="auto"> Tự đổi proxy khác nếu proxy chết</label></div>';
   document.body.appendChild(pxDlg);
   let pxDlgSlot = -1, pxPresets = [], pxRes = {};
   const dq = (x) => pxDlg.querySelector(x);
   function pxRenderRows() {
     const p = pxDlgSlot >= 0 ? state.slots[pxDlgSlot].p : 0;
     dq(".cur").textContent = pxList[p] ? "Đang dùng: " + pxList[p] : "Đang dùng IP máy này (chưa đặt proxy)";
+    dq("[data-x=auto]").checked = pxAuto[p] !== false;
     const order = pxPresets.slice().sort((a, b) => {
       const ra = pxRes[a.id], rb = pxRes[b.id];
       const ka = !ra ? 1 : ra.ok ? 0 : 2, kb = !rb ? 1 : rb.ok ? 0 : 2; // sống trước, chưa kiểm tra giữa, chết cuối
@@ -545,6 +561,11 @@
     if (e.target === pxDlg || (x && x.dataset.x === "close")) return pxDlg.close();
     if (!x) return;
     const i = pxDlgSlot;
+    if (x.dataset.x === "auto") {
+      const p = state.slots[i].p, on = x.checked;
+      pxPost("/__proxy/auto", { slot: p, on }).then(() => { pxAuto[p] = on; }).catch((err) => { x.checked = !on; logToast("Proxy", err.message); });
+      return;
+    }
     if (x.dataset.x === "test") pxTestAll();
     else if (x.dataset.x === "manual") { pxDlg.close(); manualPx(i); }
     else if (x.dataset.x === "off") { pxDlg.close(); applyPx(i, { url: "" }); }
