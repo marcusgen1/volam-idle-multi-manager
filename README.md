@@ -184,6 +184,11 @@ rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để
   `● không kết nối` / `● proxy lỗi` (đỏ) khi kiểm tra thất bại hoặc game vừa gặp lỗi qua proxy; `○ chưa đặt proxy` khi khung dùng IP máy. Rê chuột vào để xem chi tiết (proxy, IP máy, giờ kiểm tra, nội dung lỗi), bấm vào để kiểm tra lại ngay.
   App tự kiểm tra mỗi 60 giây (một yêu cầu nhỏ qua proxy) và đọc lỗi thật từ lưu lượng game mỗi 10 giây.
 - Các khung 1–4 chạy như cũ. Proxy gắn với **cổng** của khung (cổng 8805), không gắn với vị trí hiển thị: xóa khung 1–4 rồi thêm lại không làm khung 5 mất proxy. Khung 5 là khung được thêm sau cùng khi 4 khung đầu còn đủ.
+- **Tự đổi proxy khi proxy chết** (ô tích trong hộp 🌐, mặc định bật, nhớ ở `quan-ly-4-acc/proxy-auto.json`, không đưa lên GitHub): máy chủ cứ 30 giây kiểm tra proxy của khung
+  (bỏ qua nếu vừa có lưu lượng game đi qua thành công). Proxy không trả lời 2 lần liên tiếp **và** IP máy vẫn ra mạng được (tránh đổi oan khi mất mạng) thì máy chủ thử cả danh sách
+  chọn sẵn, đổi sang proxy sống **nhanh nhất, ưu tiên cùng nước** với proxy cũ, bỏ proxy đang dùng ở khung khác, rồi ghi vào `proxy.json`. Khung không cần tải lại (lệnh gọi game đi qua máy chủ nên lấy
+  proxy mới ngay; kết nối WebSocket cũ đứt thì game tự nối lại). Trang quản lý báo bằng thông báo nhỏ và tooltip của nhãn trạng thái. Không còn proxy chọn sẵn nào sống thì giữ nguyên và thử lại sau 2 phút.
+  Chạy ở máy chủ nên vẫn hoạt động khi bạn không mở trang quản lý. Đổi IP giữa chừng có thể làm game hỏi đăng nhập lại; không muốn thì bỏ tích ô này.
 - **Proxy MTProto của Telegram (Server / Port / Secret) không dùng được**: nó chỉ chạy cho ứng dụng Telegram. Cần proxy HTTP/HTTPS hoặc SOCKS5.
 - Thư viện chống bot của game (nếu bật) và font / ảnh từ CDN vẫn tải trực tiếp từ máy bạn. Nếu proxy hỏng, khung đó không tải được game (không tự quay về IP máy để tránh lộ IP thật).
 
