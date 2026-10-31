@@ -30,6 +30,7 @@
   const TRACKER_ALWAYS_ON = true;
   // "Chạy tất cả": lần lượt các chế độ này, xong hết thì về Luyện Công
   const COMBO = ["dg", "quest"];
+  const STEPS = ["dg", "ldt", "quest"]; // thứ tự các bước hẹn giờ
   // Dòng nhật ký game ghi khi tự dời về bãi luyện công vì hết việc
   const DONE_LOG = { quest: "Hết nhiệm vụ, luyện công", dg: "Hết lượt phó bản, luyện công" };
   const TOAST_DONE = { dg: "Hết lượt phó bản" };
@@ -37,8 +38,7 @@
   let desired = null; // chế độ muốn giữ, null = không điều khiển
   let queue = []; // các việc còn lại của "Chạy tất cả" (sau việc đang làm)
   let comboAfter = "farm"; // chế độ sau khi "Chạy PB + NV" xong hết: "farm" (Luyện Công) hoặc "tower" (Leo Tháp)
-  let comboBuy = false; // chạy hẹn giờ: sau khi hết các việc thì mua lệnh bài Dã Tẩu rồi mới sang comboAfter
-  let comboRun = 0; // số thứ tự lần chạy combo hiện tại; bạn chọn chế độ khác trong lúc đang mua thì lần mua đó không kéo khung về comboAfter nữa
+  let comboRun = 0; // số thứ tự lần chạy combo hiện tại; bạn chọn chế độ khác trong lúc đang mua thì lần mua đó không kéo khung đi tiếp nữa
   let note = ""; // lý do lần tự chuyển gần nhất (báo cho trang quản lý)
   let applied = true; // đã bấm chuyển sang desired chưa
   let tries = 0;
@@ -100,40 +100,35 @@
   const finishWork = (why) => {
     const label = desired === "quest" ? "nhiệm vụ" : "lượt phó bản";
     note = "Hết " + label + ": " + why; // hiện ở trang quản lý để biết vì sao tự chuyển
-    if (queue.length) {
-      // đang chạy "tất cả": sang việc kế tiếp thay vì về Luyện Công
-      desired = queue.shift();
-      console.log("[VL] Hết " + label + " (" + why + ") -> sang " + desired);
-      applied = true;
-      resetWork();
-      clickMode(desired);
-      report(true, true);
-      return;
-    }
-    const next = comboAfter === "tower" ? "tower" : "farm";
-    if (comboBuy) {
-      comboBuy = false;
-      buyThenGo(next, "Hết " + label + ": " + why);
-      return;
-    }
-    console.log("[VL] Hết " + label + " (" + why + ") -> " + (next === "tower" ? "Leo Tháp" : "về Luyện Công"));
-    desired = next;
+    console.log("[VL] Hết " + label + " (" + why + ")");
+    advance();
+  };
+  const goMode = (m) => {
+    desired = m;
+    applied = true;
     farmSince = 0;
     tries = 0;
     resetWork();
-    clickMode(next);
+    clickMode(m);
     report(true, true);
   };
-  // Lần chạy hẹn giờ: về Luyện Công trong lúc mua lệnh bài Dã Tẩu (cửa sổ game bận thì thử lại vài lần), xong mới sang chế độ cuối (Leo Tháp / Luyện Công)
-  const buyThenGo = (next, why) => {
+  // Sang việc kế tiếp trong hàng chờ ("ldt" = mua lệnh bài Dã Tẩu); hết hàng thì sang chế độ cuối (Leo Tháp / Luyện Công)
+  const advance = () => {
+    const s = queue.shift();
+    if (s === "ldt") return buyLdt();
+    if (s) {
+      console.log("[VL] -> sang " + s);
+      return goMode(s);
+    }
+    const next = comboAfter === "tower" ? "tower" : "farm";
+    console.log("[VL] -> " + (next === "tower" ? "Leo Tháp" : "Luyện Công"));
+    goMode(next);
+  };
+  // Lần chạy hẹn giờ: về Luyện Công trong lúc mua lệnh bài Dã Tẩu (cửa sổ game bận thì thử lại vài lần), xong làm tiếp việc kế
+  const buyLdt = () => {
     const run = comboRun;
-    note = why + " → mua lệnh bài Dã Tẩu";
-    desired = "farm";
-    farmSince = 0;
-    tries = 0;
-    resetWork();
-    clickMode("farm");
-    report(true, true);
+    note = (note ? note + " → " : "") + "mua lệnh bài Dã Tẩu";
+    goMode("farm");
     (async () => {
       for (let t = 0; t < 6 && run === comboRun; t++) {
         await runPd("ldt", {});
@@ -141,14 +136,8 @@
         await wait(10000);
       }
       if (run !== comboRun) return; // bạn đã chọn chế độ khác
-      note = "Đã mua lệnh bài Dã Tẩu → " + (next === "tower" ? "Leo Tháp" : "Luyện Công");
-      console.log("[VL] " + note);
-      desired = next;
-      farmSince = 0;
-      tries = 0;
-      resetWork();
-      clickMode(next);
-      report(true, true);
+      note = "Đã mua lệnh bài Dã Tẩu";
+      advance();
     })().catch(() => {});
   };
   const curMode = () => {
@@ -1709,23 +1698,17 @@
     queue = [];
     note = "";
     comboRun++;
-    comboBuy = false;
     comboAfter = m.mode === "combo" && m.after === "tower" ? "tower" : "farm";
     if (m.mode === "combo") {
-      // steps (hẹn giờ): danh sách việc cần chạy, bỏ trống thì mặc định Phó Bản rồi Nhiệm Vụ. buy: mua lệnh bài Dã Tẩu sau khi hết việc.
-      const steps = Array.isArray(m.steps) ? COMBO.filter((x) => m.steps.includes(x)) : COMBO;
-      comboBuy = !!m.buy;
-      if (steps.length) {
-        queue = steps.slice(1);
-        desired = steps[0];
-      } else if (comboBuy) {
-        comboBuy = false;
+      // steps (hẹn giờ): danh sách việc theo thứ tự Phó Bản → mua lệnh bài ("ldt") → Nhiệm Vụ, bỏ trống thì mặc định Phó Bản rồi Nhiệm Vụ
+      const steps = Array.isArray(m.steps) ? STEPS.filter((x) => m.steps.includes(x)) : COMBO;
+      queue = steps.slice(1);
+      if (steps[0] === "ldt") {
         explicit = false;
-        buyThenGo(comboAfter, "Hẹn giờ");
+        buyLdt();
         return;
-      } else {
-        desired = comboAfter;
       }
+      desired = steps.length ? steps[0] : comboAfter;
     } else {
       desired = m.mode;
     }
@@ -1752,8 +1735,7 @@
       const b = e.target.closest("#mswMenu [data-msw], [data-mode]");
       if (!b) return;
       desired = b.dataset.msw || b.dataset.mode;
-      comboRun++; // bạn tự chọn: hủy phần "mua lệnh bài rồi về ..." của lần chạy hẹn giờ đang dở
-      comboBuy = false;
+      comboRun++; // bạn tự chọn: hủy phần "mua lệnh bài rồi đi tiếp" của lần chạy hẹn giờ đang dở
       queue = [];
       note = "";
       applied = true;

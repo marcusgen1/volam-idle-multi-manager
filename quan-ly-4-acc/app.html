@@ -1321,7 +1321,7 @@
   const pad2 = (n) => String(n).padStart(2, "0");
   const dayKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   const schedAt = (day, t) => { const [h, m] = String(t).split(":").map(Number); return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0, 0); };
-  const schedSteps = () => [sc().dg && "Phó Bản", sc().quest && "Nhiệm Vụ", sc().buy && "mua lệnh bài Dã Tẩu"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
+  const schedSteps = () => [sc().dg && "Phó Bản", sc().buy && "mua lệnh bài Dã Tẩu", sc().quest && "Nhiệm Vụ"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
   function schedNext() {
     const now = new Date();
     let best = null;
@@ -1354,7 +1354,7 @@
       s.pet = false;
       save();
       refresh(i);
-      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", steps: [sc().dg && "dg", sc().quest && "quest"].filter(Boolean), buy: !!sc().buy });
+      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", steps: [sc().dg && "dg", sc().buy && "ldt", sc().quest && "quest"].filter(Boolean) });
       pending.delete(i);
       done.push(i);
     }
@@ -1416,8 +1416,8 @@
       '<h4>Các ngày trong tuần</h4><div class="row">' + order.map((k) => '<label><input type="checkbox" data-s="day" data-k="' + k + '"' + (c.days[k] ? " checked" : "") + '> ' + DAY_NAMES[k] + '</label>').join("") + '</div>' +
       '<h4>Các việc, làm tuần tự</h4><div class="row">' +
       '<label><input type="checkbox" data-s="dg"' + (c.dg ? " checked" : "") + '> Phó Bản</label>' +
-      '<label><input type="checkbox" data-s="quest"' + (c.quest ? " checked" : "") + '> Nhiệm Vụ</label>' +
-      '<label title="Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác"><input type="checkbox" data-s="buy"' + (c.buy ? " checked" : "") + '> Mua lệnh bài Dã Tẩu</label></div>' +
+      '<label title="Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác"><input type="checkbox" data-s="buy"' + (c.buy ? " checked" : "") + '> Mua lệnh bài Dã Tẩu</label>' +
+      '<label><input type="checkbox" data-s="quest"' + (c.quest ? " checked" : "") + '> Nhiệm Vụ</label></div>' +
       '<div class="row" style="margin-top:6px"><span style="font-size:13px">Xong thì về:</span><select data-s="after"><option value="tower"' + (c.after === "tower" ? " selected" : "") + '>Leo Tháp</option><option value="farm"' + (c.after !== "tower" ? " selected" : "") + '>Luyện Công</option></select></div>' +
       '<h4>Áp dụng cho các khung</h4><div class="row">' +
       state.slots.map((s, i) => '<label><input type="checkbox" data-s="slot" data-p="' + s.p + '"' + (!c.slots || c.slots.includes(s.p) ? " checked" : "") + '> Khung ' + (i + 1) + '</label>').join("") + '</div>' +
