@@ -30,7 +30,8 @@
   const TRACKER_ALWAYS_ON = true;
   // "Chạy tất cả": lần lượt các chế độ này, xong hết thì về Luyện Công
   const COMBO = ["dg", "quest"];
-  const STEPS = ["sell", "dg", "ldt", "quest"]; // thứ tự các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống)
+  const STEPS = ["sell", "dg", "ldt", "dong", "dung", "mo", "hb", "quest"]; // thứ tự các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống)
+  const PD_STEPS = ["ldt", "dong", "dung", "mo", "hb"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
   // Dòng nhật ký game ghi khi tự dời về bãi luyện công vì hết việc
   const DONE_LOG = { quest: "Hết nhiệm vụ, luyện công", dg: "Hết lượt phó bản, luyện công" };
   const TOAST_DONE = { dg: "Hết lượt phó bản" };
@@ -116,7 +117,7 @@
   // Sang việc kế tiếp trong hàng chờ ("ldt" = mua lệnh bài Dã Tẩu); hết hàng thì sang chế độ cuối (Leo Tháp / Luyện Công)
   const advance = () => {
     const s = queue.shift();
-    if (s === "ldt") return buyLdt();
+    if (PD_STEPS.includes(s)) return pdStep(s);
     if (s === "sell") return sellStep();
     if (s) {
       console.log("[VL] -> sang " + s);
@@ -126,19 +127,21 @@
     console.log("[VL] -> " + (next === "tower" ? "Leo Tháp" : "Luyện Công"));
     goMode(next);
   };
-  // Lần chạy hẹn giờ: về Luyện Công trong lúc mua lệnh bài Dã Tẩu (cửa sổ game bận thì thử lại vài lần), xong làm tiếp việc kế
-  const buyLdt = () => {
+  // Lần chạy hẹn giờ: về Luyện Công rồi chạy một việc pd (mua lệnh bài Dã Tẩu, đóng/dùng bình, mở rương, hồng bao); cửa sổ game bận hoặc game chậm thì thử lại vài lần, xong làm tiếp việc kế
+  const pdStep = (kind) => {
     const run = comboRun;
-    note = (note ? note + " → " : "") + "mua lệnh bài Dã Tẩu";
+    note = (note ? note + " → " : "") + PD_NAME[kind];
     goMode("farm");
     (async () => {
       for (let t = 0; t < 6 && run === comboRun; t++) {
-        await runPd("ldt", {});
-        if (!/đang mở cửa sổ khác|Chưa vào game|game không phản hồi/.test(pdMsg)) break; // khung chậm (proxy xa): mở lại Kỳ Trân Các thử lần nữa
+        for (let w = 0; w < 30 && pdRun; w++) await wait(2000); // đang có lần chạy tay khác: chờ xong
+        pdMsg = "";
+        await runPd(kind, {});
+        if (!/đang mở cửa sổ khác|Chưa vào game|game không phản hồi/.test(pdMsg)) break; // khung chậm (proxy xa): mở lại cửa sổ thử lần nữa
         await wait(10000);
       }
       if (run !== comboRun) return; // bạn đã chọn chế độ khác
-      note = "Đã mua lệnh bài Dã Tẩu";
+      note = "Xong: " + PD_NAME[kind];
       advance();
     })().catch(() => {});
   };
@@ -1727,7 +1730,7 @@
       comboKept = !!m.kept;
       const steps = Array.isArray(m.steps) ? STEPS.filter((x) => m.steps.includes(x)) : COMBO;
       queue = steps.slice(1);
-      if (steps[0] === "sell" || steps[0] === "ldt") {
+      if (steps[0] === "sell" || PD_STEPS.includes(steps[0])) {
         explicit = false;
         queue = steps.slice(); // bước đầu không phải chế độ: để advance() lấy từ đầu hàng
         advance();
