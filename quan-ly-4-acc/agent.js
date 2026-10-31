@@ -136,7 +136,7 @@
     const sv = ready ? readSave() : null; // số liệu thật từ bản lưu của game (không phụ thuộc việc khung có đang được vẽ)
     const ok = ready && charLoaded(); // không có bản lưu thì đọc chữ trên thanh trên, nhưng chỉ khi đã vào nhân vật (trước đó là số mặc định: cấp 1, 0 lượng)
     if (sv && sv.name) heroName = sv.name;
-    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, petOn: petRun, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", black: ready && readBlack(), sync: !!sync };
+    const msg = { type: "status", mode: curMode(), ready, hero: ready ? heroName : "", lvl: sv ? sv.lvl : ok ? readLevel() : 0, gold: sv ? fmtGold(sv.gold) : ok ? readText("#gold") : "", goldN: sv ? sv.gold : null, knb: sv ? fmtKnb(sv.knb) : ok ? readText("#knbTop") : "", knbN: sv ? sv.knb : null, tower: sv ? sv.tw : ok ? readTower() : 0, desired, next: queue[0] || null, note, boss: bossMsg, pet: petMsg, petOn: petRun, pd: pdMsg, sell: sellMsg, auto: autoSell, autoInfo: autoSell ? autoInfo : "", black: ready && readBlack(), acct: ready ? readAcct() : "", dev: ready ? readDev() : "", sync: !!sync };
     const s = JSON.stringify(msg);
     const now = Date.now();
     if (!force && s === lastSent && now - lastSentAt < 3000) return;
@@ -1792,6 +1792,27 @@
       restoreTab(prev);
     }
     return out;
+  };
+  // Tài khoản đang đăng nhập ở khung này (game giữ phiên Supabase trong sessionStorage, email dạng "tên@..." nên chỉ lấy phần tên)
+  // và 6 ký tự đầu mã máy của game (localStorage "jxDev"), để nhìn ra hai khung có đang dùng chung tài khoản / mã máy không.
+  const readAcct = () => {
+    try {
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (!/^jxidle_auth/.test(k)) continue;
+        const j = JSON.parse(sessionStorage.getItem(k) || "null");
+        const e = j && ((j.user && j.user.email) || (j.session && j.session.user && j.session.user.email));
+        if (e) return String(e).split("@")[0].slice(0, 24);
+      }
+    } catch (e) {}
+    return "";
+  };
+  const readDev = () => {
+    try {
+      return (localStorage.getItem("jxDev") || "").slice(0, 6);
+    } catch (e) {
+      return "";
+    }
   };
   // Màn hình đen: tùy chọn "Màn hình đen" ở Hệ thống > Hiển Thị của game (ngừng vẽ, game vẫn chạy). Game nhớ lựa chọn trong localStorage "jxidle_ui".
   // Ô tích chỉ có trong trang khi thẻ Hệ thống đã được nạp, nên mở thẻ đó một lần chạy (trả lại thẻ cũ ngay) rồi tích / bỏ tích như bạn vẫn làm.
