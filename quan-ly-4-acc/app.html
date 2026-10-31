@@ -246,8 +246,9 @@
     if (pb) pb.classList.toggle("on", !!state.slots[i].pet);
     const l = live[i];
     const ttl = slotTitle(i);
-    if (c.title.textContent !== ttl) c.title.textContent = ttl;
-    c.title.title = ttl;
+    const who = l && l.ready && l.acct ? " · tk " + l.acct : "";
+    if (c.title.textContent !== ttl + who) c.title.textContent = ttl + who;
+    c.title.title = ttl + (l && l.ready && l.acct ? "\nTài khoản đăng nhập: " + l.acct + (l.dev ? "\nMã máy của game: " + l.dev + "…" : "") : "");
     const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     if (!state.slots[i].on) {
       c.st.textContent = "Đang tắt";
@@ -306,7 +307,7 @@
       // Nhớ tên + cấp lần cuối đọc được để lần sau mở trang vẫn hiện ngay
       if (m.ready && m.hero && s.hero !== m.hero) { s.hero = m.hero; save(); }
       if (m.ready && m.lvl > 0 && s.lvl !== m.lvl) { s.lvl = m.lvl; save(); }
-      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", goldN: m.goldN, knbN: m.knbN, tower: m.tower | 0, black: !!m.black };
+      const nl = { hero: m.hero || "", lvl: m.lvl | 0, mode: m.mode, ready: !!m.ready, next: m.next || null, note: m.note || "", boss: m.boss || "", pet: m.pet || "", pd: m.pd || "", sell: m.sell || "", autoInfo: m.autoInfo || "", gold: m.gold || "", knb: m.knb || "", goldN: m.goldN, knbN: m.knbN, tower: m.tower | 0, black: !!m.black, acct: m.acct || "", dev: m.dev || "" };
       // Thông báo nào vừa đổi thì hiện làm thông báo mới nhất trên dòng trạng thái
       nl.lastMsg = prev.lastMsg || "";
       for (const k of ["note", "boss", "pet", "pd", "sell"]) if (nl[k] && nl[k] !== prev[k]) nl.lastMsg = nl[k];
