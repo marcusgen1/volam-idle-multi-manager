@@ -6,7 +6,10 @@
 (() => {
   if (window.__vlAgent) return;
   window.__vlAgent = true;
-  if (window.parent === window) return; // mở game trực tiếp thì không làm gì
+  // Trong ứng dụng desktop, desktop/preload-game.js tạo window.__vlBridge (post / on) để nói chuyện với trang quản lý;
+  // trong trình duyệt thì dùng postMessage giữa khung và trang cha.
+  const BR = window.__vlBridge;
+  if (!BR && window.parent === window) return; // mở game trực tiếp thì không làm gì
 
   const DASH = location.protocol + "//" + location.hostname + ":8800";
   const MODES = ["farm", "dg", "quest", "tower", "combo"];
@@ -126,7 +129,8 @@
   };
   const post = (o) => {
     try {
-      window.parent.postMessage(Object.assign({ vl: 1 }, o), DASH);
+      if (BR) BR.post(Object.assign({ vl: 1 }, o));
+      else window.parent.postMessage(Object.assign({ vl: 1 }, o), DASH);
     } catch (e) {}
   };
 
@@ -1632,9 +1636,7 @@
     autoSellLast = r.sold > 0 ? 0 : Date.now(); // bán được thì lần sau đầy lại bán tiếp; không có gì để bán thì nghỉ một lúc
   }
 
-  window.addEventListener("message", (e) => {
-    if (e.source !== window.parent || e.origin !== DASH) return;
-    const m = e.data;
+  const onCommand = (m) => {
     if (m && m.vl === 1 && m.type === "boss") {
       runBoss();
       return;
@@ -1685,7 +1687,14 @@
     farmSince = 0;
     resetWork();
     tick();
-  });
+  };
+  if (BR) BR.on(onCommand);
+  else {
+    window.addEventListener("message", (e) => {
+      if (e.source !== window.parent || e.origin !== DASH) return;
+      onCommand(e.data);
+    });
+  }
 
   // Bạn tự bấm đổi chế độ trong khung (click thật) -> theo lựa chọn của bạn, không giằng co
   document.addEventListener(

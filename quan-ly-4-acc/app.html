@@ -61,7 +61,7 @@
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .modes .st b { color:var(--ok); font-weight:600; }
   .frame { position:relative; flex:1; min-height:0; background:#000; }
-  iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  iframe, webview { position:absolute; inset:0; width:100%; height:100%; border:0; }
   .off { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--dim); background:#0a0f0d; }
   #upd { display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:3px 10px; background:#2b2a14; border-bottom:1px solid var(--accent); color:var(--accent); font-size:12px; }
   #upd[hidden] { display:none; }
@@ -131,7 +131,7 @@
 <script>
 (async () => {
   // Cấu hình từ máy chủ: cổng gốc và số cổng đã mở (mỗi khung cần một cổng riêng). Máy chủ cũ không có thì mặc định 4.
-  let cfg = { base: 8800, max: 4 };
+  let cfg = { base: 8800, max: 4, app: false, game: "https://volamidle.pages.dev/" };
   try {
     const r = await fetch("/__config", { cache: "no-store" });
     if (r.ok) cfg = Object.assign(cfg, await r.json());
@@ -155,6 +155,9 @@
   const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, m || "—"])[2];
 
   // Mỗi khung có một số cổng p cố định (cổng = BASE_PORT + p) nên phiên đăng nhập không bị lẫn khi thêm / xóa khung.
+  // Trong ứng dụng desktop (desktop/main.js): mỗi khung là một <webview> có phiên riêng (partition persist:acc<số cổng>, như một hồ sơ trình duyệt riêng)
+  // mở thẳng trang game chính thức. Trong trình duyệt thường: iframe tới các cổng 8801… của máy chủ cục bộ (game bản mới không còn chạy kiểu này).
+  const APP = !!window.vlApp && !!cfg.app;
   const frameOrigin = (i) => location.protocol + "//" + location.hostname + ":" + (BASE_PORT + state.slots[i].p);
   const frameUrl = (i) => frameOrigin(i) + "/";
 
@@ -185,7 +188,15 @@
 
   function post(i, msg) {
     const f = els[i] && els[i].iframe;
-    if (!f || !f.contentWindow) return;
+    if (!f) return;
+    if (APP) {
+      // webview chỉ nhận lệnh sau khi trang đã nạp xong (dom-ready): xếp hàng chờ rồi gửi dồn
+      const m = Object.assign({ vl: 1 }, msg);
+      if (!f.__ready) f.__q.push(m);
+      else { try { f.send("vl", m); } catch (e) {} }
+      return;
+    }
+    if (!f.contentWindow) return;
     try { f.contentWindow.postMessage(Object.assign({ vl: 1 }, msg), frameOrigin(i)); } catch (e) {}
   }
   const send = (i, mode, restore) => post(i, { type: "setMode", mode, restore: !!restore, after: state.comboAfter === "tower" ? "tower" : "farm" });
@@ -273,9 +284,30 @@
     c.iframe = null;
     live[i] = { mode: null, ready: false };
     if (on) {
-      const f = document.createElement("iframe");
-      f.setAttribute("allow", "autoplay; fullscreen");
-      f.src = frameUrl(i);
+      let f;
+      if (APP) {
+        f = document.createElement("webview");
+        f.setAttribute("partition", "persist:acc" + state.slots[i].p);
+        f.setAttribute("src", cfg.game);
+        f.__q = [];
+        f.__ready = false;
+        f.addEventListener("did-start-loading", () => { f.__ready = false; });
+        f.addEventListener("dom-ready", () => {
+          f.__ready = true;
+          const q = f.__q.splice(0);
+          q.forEach((m) => { try { f.send("vl", m); } catch (e) {} });
+          fitFrame(c);
+        });
+        f.addEventListener("ipc-message", (e) => {
+          if (e.channel !== "vl") return;
+          const j = els.findIndex((x) => x.iframe === f);
+          if (j >= 0) onFrameMsg(j, e.args[0]);
+        });
+      } else {
+        f = document.createElement("iframe");
+        f.setAttribute("allow", "autoplay; fullscreen");
+        f.src = frameUrl(i);
+      }
       c.frame.appendChild(f);
       c.iframe = f;
       fitFrame(c);
@@ -294,6 +326,10 @@
     if (!m || m.vl !== 1) return;
     const i = els.findIndex((c) => c.iframe && c.iframe.contentWindow === e.source);
     if (i < 0 || e.origin !== frameOrigin(i)) return;
+    onFrameMsg(i, m);
+  });
+  function onFrameMsg(i, m) {
+    if (!m || m.vl !== 1) return;
     if (m.type === "hello") {
       const d = state.slots[i].desired;
       if (d) { ensureGrid(d); send(i, d, true); }
@@ -321,7 +357,7 @@
       refresh(i);
       renderBlack();
     }
-  });
+  }
 
   // Game chỉ vẽ trọn bố cục ngang khi khung rộng từ ~640px; hẹp hơn thì chừa một dải đen bên phải. Ô lưới hẹp hơn mức đó (ví dụ 3 khung
   // trên của lưới 5 khung) thì cho game chạy ở bề rộng tối thiểu rồi thu nhỏ vừa ô. Chỉ áp dụng cho ô nằm ngang; bố cục 1 hàng (khung dọc) giữ nguyên.
@@ -330,6 +366,14 @@
     const f = c.iframe;
     if (!f) return;
     const w = c.frame.clientWidth, h = c.frame.clientHeight;
+    if (APP) {
+      // webview: không dùng transform mà thu nhỏ bằng zoom của trang, để game thấy khung rộng GAME_MIN_W và vẫn nhận chuột / bàn phím đúng
+      const k = state.layout !== "row" && w > 0 && w < GAME_MIN_W && w >= h * 0.9 ? w / GAME_MIN_W : 1;
+      if (f.__ready && f.__zoom !== k) {
+        try { f.setZoomFactor(k); f.__zoom = k; } catch (e) {}
+      }
+      return;
+    }
     if (state.layout !== "row" && w > 0 && w < GAME_MIN_W && w >= h * 0.9) {
       const k = w / GAME_MIN_W;
       f.style.width = GAME_MIN_W + "px";
@@ -630,7 +674,8 @@
     add.title = n >= MAX_SLOTS ? "Đã đủ " + MAX_SLOTS + " khung (số cổng máy chủ đã mở)" : "Thêm một khung game mới (" + n + "/" + MAX_SLOTS + ")";
     document.getElementById("foot").textContent =
       "Nhiệm Vụ và Phó Bản: game tự về Luyện Công khi hết việc. Leo Tháp: gục ngã thì tự vào lại. " +
-      "Mỗi khung chạy ở một cổng riêng (" + (BASE_PORT + 1) + "–" + (BASE_PORT + MAX_SLOTS) + ") nên mỗi tài khoản có phiên đăng nhập riêng. " +
+      (APP ? "Mỗi khung có phiên riêng (như một hồ sơ trình duyệt riêng) nên các tài khoản không đè lên nhau. "
+           : "Mỗi khung chạy ở một cổng riêng (" + (BASE_PORT + 1) + "–" + (BASE_PORT + MAX_SLOTS) + ") nên mỗi tài khoản có phiên đăng nhập riêng. ") +
       "Trang này không lưu mật khẩu.";
     applyLayout();
   }
@@ -899,7 +944,7 @@
         try {
           const u = await (await fetch("/__update", { cache: "no-store" })).json();
           if (u.error) err = u.error;
-          if (!u.behind) { location.reload(); return; }
+          if (!u.behind) { if (window.vlApp) window.vlApp.relaunch(); else location.reload(); return; }
           if (!u.busy) break;
         } catch (e) {}
       }
