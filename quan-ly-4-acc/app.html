@@ -171,7 +171,8 @@
     ["dg", "🏯", "Phó Bản"],
     ["tower", "🗼", "Leo Tháp"],
   ];
-  const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, m || "—"])[2];
+  const STEP_NAME = { sell: "Bán đồ", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao" }; // các bước hẹn giờ không phải chế độ
+  const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, STEP_NAME[m] || m || "—"])[2];
 
   // Mỗi khung có một số cổng p cố định (cổng = BASE_PORT + p) nên phiên đăng nhập không bị lẫn khi thêm / xóa khung.
   // Trong ứng dụng desktop (desktop/main.js): mỗi khung là một <webview> có phiên riêng (partition persist:acc<số cổng>, như một hồ sơ trình duyệt riêng)
@@ -1315,13 +1316,13 @@
   // khung chưa vào game thì thử lại trong 10 phút (ví dụ đang tự đăng nhập lại), quá thì bỏ qua lần đó. Mỗi giờ hẹn chỉ chạy một lần mỗi ngày.
   const SCHED_GRACE_MS = 10 * 60 * 1000;
   const DAY_NAMES = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-  const schedDefault = () => ({ on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], sell: true, dg: true, quest: true, buy: true, after: "tower", slots: null, last: {} });
+  const schedDefault = () => ({ on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], sell: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, after: "tower", slots: null, last: {} });
   state.sched = Object.assign(schedDefault(), state.sched || {});
   const sc = () => state.sched;
   const pad2 = (n) => String(n).padStart(2, "0");
   const dayKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   const schedAt = (day, t) => { const [h, m] = String(t).split(":").map(Number); return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0, 0); };
-  const schedSteps = () => [sc().sell && "bán đồ xanh + HK cơ bản", sc().dg && "Phó Bản", sc().buy && "mua lệnh bài Dã Tẩu", sc().quest && "Nhiệm Vụ"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
+  const schedSteps = () => [sc().sell && "bán đồ xanh + HK cơ bản", sc().dg && "Phó Bản", sc().buy && "mua lệnh bài Dã Tẩu", sc().dong && "đóng bình PD", sc().dung && "dùng bình PD", sc().mo && "mở hết rương PD", sc().hb && "mở hồng bao", sc().quest && "Nhiệm Vụ"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
   function schedNext() {
     const now = new Date();
     let best = null;
@@ -1354,7 +1355,7 @@
       s.pet = false;
       save();
       refresh(i);
-      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", kept: !!state.sellKept, steps: [sc().sell && "sell", sc().dg && "dg", sc().buy && "ldt", sc().quest && "quest"].filter(Boolean) });
+      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", kept: !!state.sellKept, steps: [sc().sell && "sell", sc().dg && "dg", sc().buy && "ldt", sc().dong && "dong", sc().dung && "dung", sc().mo && "mo", sc().hb && "hb", sc().quest && "quest"].filter(Boolean) });
       pending.delete(i);
       done.push(i);
     }
@@ -1418,6 +1419,10 @@
       '<label title="Trước khi chạy: bán đồ xanh rồi bán HK cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) để có chỗ trống trong hành trang. Giữ món khóa 🔒, đồ đang mặc, món cường hóa. Không hoàn tác"><input type="checkbox" data-s="sell"' + (c.sell ? " checked" : "") + '> Bán đồ xanh + HK cơ bản</label>' +
       '<label><input type="checkbox" data-s="dg"' + (c.dg ? " checked" : "") + '> Phó Bản</label>' +
       '<label title="Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác"><input type="checkbox" data-s="buy"' + (c.buy ? " checked" : "") + '> Mua lệnh bài Dã Tẩu</label>' +
+      '<label title="Đóng bình Phúc Duyên (như nút Đóng bình PD)"><input type="checkbox" data-s="dong"' + (c.dong ? " checked" : "") + '> Đóng bình PD</label>' +
+      '<label title="Dùng hết bình Phúc Duyên Lộ trong hành trang"><input type="checkbox" data-s="dung"' + (c.dung ? " checked" : "") + '> Dùng bình PD</label>' +
+      '<label title="Mở hết rương Phúc Duyên"><input type="checkbox" data-s="mo"' + (c.mo ? " checked" : "") + '> Mở hết PD</label>' +
+      '<label title="Mở hồng bao"><input type="checkbox" data-s="hb"' + (c.hb ? " checked" : "") + '> Mở hồng bao</label>' +
       '<label><input type="checkbox" data-s="quest"' + (c.quest ? " checked" : "") + '> Nhiệm Vụ</label></div>' +
       '<div class="row" style="margin-top:6px"><span style="font-size:13px">Xong thì về:</span><select data-s="after"><option value="tower"' + (c.after === "tower" ? " selected" : "") + '>Leo Tháp</option><option value="farm"' + (c.after !== "tower" ? " selected" : "") + '>Luyện Công</option></select></div>' +
       '<h4>Áp dụng cho các khung</h4><div class="row">' +
@@ -1441,7 +1446,7 @@
       case "on": c.on = x.checked; break;
       case "time": if (/^\d{2}:\d{2}$/.test(x.value)) c.times[k] = x.value; break;
       case "day": c.days[k] = x.checked ? 1 : 0; break;
-      case "sell": case "dg": case "quest": case "buy": c[x.dataset.s] = x.checked; break;
+      case "sell": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": c[x.dataset.s] = x.checked; break;
       case "after": c.after = x.value === "tower" ? "tower" : "farm"; break;
       case "slot": {
         const all = state.slots.map((s) => s.p), cur = new Set(c.slots || all);
