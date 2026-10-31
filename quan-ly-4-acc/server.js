@@ -6,6 +6,7 @@
 // Nội dung chuyển tiếp không bị lưu lại. Điều duy nhất được thay đổi: trang HTML của game được chèn thêm
 // một dòng <script src="/__agent.js"> (file agent.js cạnh server này) để trang quản lý điều khiển chế độ.
 const http = require("http");
+const net = require("net");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
@@ -13,7 +14,12 @@ const { execFile } = require("child_process");
 const { parseProxy, describeProxy, openTunnel, openTls, ProxyAgent } = require("./tunnel");
 
 const TARGET_HOST = "volamidle.pages.dev";
-const BASE_PORT = 8800;
+const BASE_PORT = parseInt(process.env.VL_BASE_PORT, 10) || 8800;
+// Chạy trong ứng dụng desktop (desktop/main.js đặt VL_APP=1): các khung là cửa sổ riêng của ứng dụng, mở thẳng trang game chính thức.
+// Máy chủ không còn chuyển tiếp trang game ở các cổng 8801… mà chỉ mở cổng chuyển tiếp proxy cục bộ cho từng khung (FWD_BASE + số khung).
+const APP_MODE = process.env.VL_APP === "1";
+const FWD_BASE = BASE_PORT + 10;
+const GAME_URL = process.env.VL_GAME_URL || "https://volamidle.pages.dev/"; // chỉ đổi khi thử nghiệm
 // Số cổng khung mở sẵn = số khung tối đa thêm được. Đổi bằng biến môi trường, ví dụ: VL_SLOTS=8 npm start
 const SLOTS = Math.min(50, Math.max(1, parseInt(process.env.VL_SLOTS, 10) || 5));
 const BIND = "127.0.0.1";
@@ -183,6 +189,7 @@ function proxy(req, res, port) {
 // Các cổng khung đã mở được (1 = BASE_PORT + 1 ...). Trang quản lý hỏi số này để biết thêm được tối đa bao nhiêu khung.
 const opened = new Set();
 function usableSlots() {
+  if (APP_MODE) return SLOTS;
   let n = 0;
   while (opened.has(n + 1)) n++; // chỉ đếm các cổng liền nhau từ cổng đầu tiên
   return n;
@@ -450,7 +457,7 @@ function dashboard(req, res) {
   }
   if (url === "/__config") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-    res.end(JSON.stringify({ base: BASE_PORT, max: usableSlots() }));
+    res.end(JSON.stringify({ base: BASE_PORT, max: usableSlots(), app: APP_MODE, fwd: FWD_BASE, game: GAME_URL }));
     return;
   }
   if (url !== "/" && url !== "/app.html") {
@@ -469,7 +476,53 @@ dash.on("error", (e) => {
 dash.listen(BASE_PORT, BIND, () => {
   console.log("Trang quản lý: http://" + BIND + ":" + BASE_PORT + "/");
 });
-for (let i = 1; i <= SLOTS; i++) {
+// Cổng chuyển tiếp cho ứng dụng desktop: chỉ nhận lệnh CONNECT (HTTPS / WebSocket của game) từ phiên của khung số slot.
+// Có proxy cho khung đó (proxy.json, kể cả khi bị tự đổi) thì đi qua proxy (HTTP / SOCKS5, có hoặc không có mật khẩu), không thì nối thẳng.
+// Cấu hình proxy được đọc lại ở mỗi kết nối nên đổi proxy có hiệu lực ngay, không cần chỉnh lại ứng dụng.
+function startForwarder(slot) {
+  const srv = http.createServer((req, res) => {
+    res.writeHead(405, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Chỉ nhận CONNECT");
+  });
+  srv.on("connect", (req, cs, head) => {
+    const m = /^(\[[^\]]+\]|[^:\s]+):(\d+)$/.exec(String(req.url));
+    const port = m ? parseInt(m[2], 10) : 0;
+    if (!m || (port !== 443 && port !== 80)) {
+      cs.end("HTTP/1.1 403 Forbidden\r\n\r\n");
+      return;
+    }
+    const host = m[1].replace(/^\[|\]$/g, "");
+    const via = proxyUrlOf(slot);
+    const open = via
+      ? openTunnel(via, host, port)
+      : new Promise((resolve, reject) => {
+          const sk = net.connect(port, host);
+          sk.once("connect", () => resolve(sk));
+          sk.once("error", reject);
+        });
+    open.then(
+      (up) => {
+        if (via) pxOk(slot);
+        cs.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+        if (head && head.length) up.write(head);
+        up.pipe(cs);
+        cs.pipe(up);
+        const end = () => { up.destroy(); cs.destroy(); };
+        up.on("error", end); cs.on("error", end); up.on("close", end); cs.on("close", end);
+      },
+      (e) => {
+        if (via) pxErr(slot, e);
+        cs.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+      }
+    );
+  });
+  srv.on("error", (e) => console.error("Cổng proxy " + (FWD_BASE + slot) + " không dùng được (" + e.code + "), khung " + slot + " sẽ không vào được game"));
+  srv.listen(FWD_BASE + slot, BIND, () => {
+    console.log("Khung " + slot + " -> cổng proxy cục bộ " + (FWD_BASE + slot) + (proxyList()[slot] ? "  (qua proxy " + proxyList()[slot] + ")" : ""));
+  });
+}
+if (APP_MODE) for (let i = 1; i <= SLOTS; i++) startForwarder(i);
+else for (let i = 1; i <= SLOTS; i++) {
   const port = BASE_PORT + i;
   const srv = http.createServer((req, res) => proxy(req, res, port));
   // Một cổng bị chương trình khác dùng thì chỉ bỏ cổng đó, các cổng còn lại vẫn chạy
