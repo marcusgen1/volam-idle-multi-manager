@@ -48,6 +48,14 @@
   #pxDlg .pxrow .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
   #pxDlg .pxrow .ms { flex:none; font-size:12px; color:var(--dim); }
   #pxDlg .pxrow .ms.ok { color:#5fd38d; } #pxDlg .pxrow .ms.warn { color:#e0b341; } #pxDlg .pxrow .ms.bad { color:#ef6b6b; }
+  #crDlg { background:var(--panel); color:var(--text); border:1px solid var(--accent); border-radius:8px; padding:10px; width:min(380px,94vw); }
+  #crDlg::backdrop { background:rgba(0,0,0,.6); }
+  #crDlg .hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  #crDlg .fld { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--dim); margin-bottom:6px; }
+  #crDlg input[type=text], #crDlg input[type=password], #crDlg #crU { width:100%; box-sizing:border-box; }
+  #crDlg .auto { display:flex; align-items:center; gap:4px; font-size:12px; margin:4px 0; cursor:pointer; }
+  #crDlg .note { font-size:12px; margin:6px 0; }
+  #crDlg .ft { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
   #pxDlg .ft { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center; }
   #pxDlg .auto { flex-basis:100%; font-size:12px; color:var(--dim); cursor:pointer; display:flex; align-items:center; gap:4px; }
   .pxst { flex:none; font-size:11px; color:var(--dim); cursor:pointer; white-space:nowrap; max-width:48%; overflow:hidden; text-overflow:ellipsis; }
@@ -394,6 +402,7 @@
       '<span class="label"></span>' +
       '<span class="pxst" hidden></span>' +
       '<button class="sm" data-a="px">🌐</button>' +
+      '<button class="sm" data-a="cred" hidden>🔑</button>' +
       '<button class="sm" data-a="reload" title="Tải lại khung này">⟳</button>' +
       '<button class="sm" data-a="max" title="Phóng to / thu nhỏ">⛶</button>' +
       '<button class="sm" data-a="power" title="Tắt / bật khung (giảm tải máy)">⏻</button>' +
@@ -432,6 +441,7 @@
     slot.querySelector('[data-a="power"]').onclick = () => { const i = idx(); state.slots[i].on = !state.slots[i].on; save(); mount(i, state.slots[i].on); };
     slot.querySelector('[data-a="del"]').onclick = () => removeSlot(c);
     slot.querySelector('[data-a="px"]').onclick = () => setPx(idx());
+    slot.querySelector('[data-a="cred"]').onclick = () => credOpen(idx());
     slot.querySelector(".pxst").onclick = () => pxCheck(state.slots[idx()].p);
     new ResizeObserver(() => fitFrame(c)).observe(c.frame);
     mount(els.length - 1, s.on);
@@ -451,6 +461,7 @@
       b.classList.toggle("on", !!u);
       b.title = u ? "Đang dùng proxy " + u + " (bấm để đổi / tắt)" : "Đặt proxy riêng cho khung này để đổi IP (khung chạy ở cổng " + (BASE_PORT + state.slots[i].p) + ")";
     });
+    renderCred();
   }
   // Trạng thái kết nối proxy của khung 5: kết quả lần kiểm tra gần nhất (qua proxy tới game) + lỗi thật ghi nhận từ lưu lượng game
   let pxTest = {}, pxStat = {}, pxAuto = {};
@@ -626,6 +637,84 @@
     pxTestAll();
   }
 
+  // --- Tài khoản / mật khẩu từng khung (chỉ trong ứng dụng desktop; mật khẩu do ứng dụng giữ, mã hóa bằng kho khóa của hệ điều hành) ---
+  let credInfo = { protect: "none", slots: {} };
+  function renderCred() {
+    els.forEach((c, i) => {
+      const b = c.slot.querySelector('[data-a="cred"]');
+      if (!b) return;
+      b.hidden = !APP;
+      const cr = credInfo.slots[state.slots[i].p];
+      b.classList.toggle("on", !!cr);
+      b.title = cr
+        ? "Đã lưu tài khoản " + cr.u + (cr.auto ? " (tự đăng nhập lại" + (cr.paused ? ", đang tạm dừng vì thất bại nhiều lần" : "") + ")" : " (không tự đăng nhập)") + ". Bấm để sửa."
+        : "Lưu tài khoản / mật khẩu cho khung này để tự đăng nhập lại khi bị thoát ra màn đăng nhập";
+    });
+  }
+  async function credRefresh() {
+    if (!APP) return;
+    try { credInfo = await window.vlApp.cred.info(); } catch (e) {}
+    renderCred();
+  }
+  const crDlg = document.createElement("dialog");
+  crDlg.id = "crDlg";
+  crDlg.innerHTML =
+    '<div class="hd"><b class="ttl"></b><button class="sm" data-c="close" title="Đóng">✕</button></div>' +
+    '<label class="fld">Tài khoản<input id="crU" maxlength="16" autocomplete="off" autocapitalize="off" spellcheck="false"></label>' +
+    '<label class="fld">Mật khẩu<input id="crP" type="password" maxlength="64" autocomplete="new-password"></label>' +
+    '<label class="auto"><input type="checkbox" id="crA"> Tự đăng nhập lại khi bị thoát ra màn đăng nhập</label>' +
+    '<div class="note"></div>' +
+    '<div class="ft"><button class="sm" data-c="save">💾 Lưu</button><button class="sm" data-c="login">▶ Đăng nhập ngay</button><button class="sm" data-c="clear">🗑 Xóa đã lưu</button></div>';
+  document.body.appendChild(crDlg);
+  let crSlot = -1;
+  const cq = (x) => crDlg.querySelector(x);
+  function credOpen(i) {
+    crSlot = i;
+    const p = state.slots[i].p, cr = credInfo.slots[p];
+    cq(".ttl").textContent = "Tài khoản của khung " + (i + 1);
+    cq("#crU").value = cr ? cr.u : "";
+    cq("#crP").value = "";
+    cq("#crP").placeholder = cr ? "(đã lưu, để trống nếu không đổi)" : "";
+    cq("#crA").checked = cr ? cr.auto : true;
+    const pr = credInfo.protect;
+    cq(".note").textContent = pr === "keyring" ? "Mật khẩu được mã hóa bằng kho khóa của hệ điều hành và chỉ lưu trên máy này."
+      : pr === "basic" ? "⚠ Máy này không có kho khóa hệ thống: mật khẩu chỉ được che, ai đọc được thư mục dữ liệu của ứng dụng đều lấy được."
+      : "⚠ Không mã hóa được mật khẩu trên máy này: mật khẩu chỉ được che, ai đọc được thư mục dữ liệu của ứng dụng đều lấy được.";
+    cq(".note").style.color = pr === "keyring" ? "var(--dim)" : "#e0b341";
+    crDlg.showModal();
+    cq(cr ? "#crP" : "#crU").focus();
+  }
+  async function credSave() {
+    const p = state.slots[crSlot].p, u = cq("#crU").value.trim(), pw = cq("#crP").value;
+    if (credInfo.protect !== "keyring" && pw && !confirm("Máy này không có kho khóa hệ thống nên mật khẩu chỉ được che, không mã hóa. Vẫn lưu?")) return false;
+    const r = await window.vlApp.cred.set(p, u, pw, cq("#crA").checked);
+    if (r && r.error) { logToast("Đăng nhập", "Khung " + (crSlot + 1) + ": " + r.error); return false; }
+    credInfo = r;
+    cq("#crP").value = "";
+    renderCred();
+    return true;
+  }
+  crDlg.onclick = async (e) => {
+    const x = e.target.closest("[data-c]");
+    if (e.target === crDlg || (x && x.dataset.c === "close")) return crDlg.close();
+    if (!x) return;
+    const i = crSlot, p = state.slots[i].p;
+    if (x.dataset.c === "save") {
+      if (await credSave()) { crDlg.close(); logToast("Đăng nhập", "Khung " + (i + 1) + ": đã lưu tài khoản " + credInfo.slots[p].u); }
+    } else if (x.dataset.c === "login") {
+      if ((cq("#crU").value.trim() !== ((credInfo.slots[p] || {}).u || "") || cq("#crP").value) && !(await credSave())) return;
+      crDlg.close();
+      const r = await window.vlApp.cred.login(p);
+      if (r !== "ok") logToast("Đăng nhập", "Khung " + (i + 1) + ": " + (r === "no-form" ? "khung không ở màn đăng nhập" : r === "none" ? "chưa lưu tài khoản" : r === "no-password" ? "không đọc được mật khẩu đã lưu, nhập lại" : "không đăng nhập được (" + r + ")"));
+    } else if (x.dataset.c === "clear") {
+      if (!credInfo.slots[p]) return crDlg.close();
+      if (!confirm("Xóa tài khoản và mật khẩu đã lưu của khung " + (i + 1) + "?")) return;
+      credInfo = await window.vlApp.cred.clear(p);
+      renderCred();
+      crDlg.close();
+    }
+  };
+
   function addSlot() {
     if (state.slots.length >= MAX_SLOTS) return;
     const used = new Set(state.slots.map((s) => s.p));
@@ -676,12 +765,17 @@
       "Nhiệm Vụ và Phó Bản: game tự về Luyện Công khi hết việc. Leo Tháp: gục ngã thì tự vào lại. " +
       (APP ? "Mỗi khung có phiên riêng (như một hồ sơ trình duyệt riêng) nên các tài khoản không đè lên nhau. "
            : "Mỗi khung chạy ở một cổng riêng (" + (BASE_PORT + 1) + "–" + (BASE_PORT + MAX_SLOTS) + ") nên mỗi tài khoản có phiên đăng nhập riêng. ") +
-      "Trang này không lưu mật khẩu.";
+      (APP ? "Mật khẩu chỉ được lưu khi bạn nhập ở nút 🔑 của khung, do ứng dụng mã hóa bằng kho khóa của hệ điều hành." : "Trang này không lưu mật khẩu.");
     applyLayout();
   }
 
   state.slots.forEach(createSlot);
   if (pxList[PX_PORT]) pxCheck(PX_PORT);
+  if (APP) {
+    credRefresh();
+    setInterval(credRefresh, 15000);
+    window.vlApp.onNote((t) => logToast("Đăng nhập", t));
+  }
 
   // ----- Nút điều khiển cho tất cả khung -----
   const allBox = document.getElementById("allModes");

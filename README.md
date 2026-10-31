@@ -138,6 +138,13 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   tự bán / bán Chợ). Giữ lại: ô 📜 (giữ cho Dã Tẩu), đồ đang mặc và đồ Bạch Kim. Gửi bằng thư thường (không phải thư giao dịch). Không thấy món nào thì báo kèm các độ hiếm đang có trong hành trang.
 - **Tài khoản và mã máy trên tên khung**: tên khung có thêm `· tk <tên tài khoản>` (đọc từ phiên đăng nhập của game trong sessionStorage của khung); rê chuột vào tên khung để xem thêm 6 ký tự đầu mã máy
   của game (`jxDev`). Dùng để nhìn ra hai khung có đang đăng nhập cùng một tài khoản hay dùng chung mã máy không.
+- **Lưu tài khoản và tự đăng nhập lại** (nút **🔑** ở mỗi khung, chỉ trong ứng dụng desktop): nhập tên tài khoản + mật khẩu cho khung đó. Khi khung bị đưa về màn đăng nhập
+  (hết phiên, bị đăng xuất, tải lại) mà không ai đang gõ phím trong vài giây, ứng dụng tự điền vào form đăng nhập của game và bấm **Đăng nhập**. **▶ Đăng nhập ngay** để đăng nhập ngay,
+  ô **Tự đăng nhập lại** bật / tắt từng khung, **🗑 Xóa đã lưu** để xóa. Nút 🔑 sáng khi khung đã lưu tài khoản.
+  - Mật khẩu lưu ở `credentials.json` trong thư mục dữ liệu của ứng dụng (quyền 0600), **mã hóa bằng kho khóa của hệ điều hành** (libsecret / kwallet trên Linux, Keychain, DPAPI). Máy không có kho khóa thì
+    chỉ được che (base64) và hộp thoại cảnh báo. Mật khẩu **không bao giờ gửi sang trang quản lý**: trang chỉ nhận tên tài khoản và các cờ; chỉ tiến trình chính điền vào form và chỉ khi khung đang ở trang game.
+  - Chống lặp: tự đăng nhập tối đa 3 lần trong 10 phút, quá thì tạm dừng 30 phút và báo (sai mật khẩu, game chặn, hoặc game tự đăng xuất ngay sau khi vào, ví dụ vượt giới hạn tài khoản mỗi máy). Ô mật khẩu đã có chữ thì không điền đè.
+  - Bạn chủ động bấm **Đăng xuất** trong game cũng đưa khung về màn đăng nhập và sẽ bị tự đăng nhập lại: tắt ô **Tự đăng nhập lại** của khung đó nếu không muốn.
 - **Màn hình đen** (🌑 ở cuối cột trái, cạnh Tải lại): bật / tắt tùy chọn "Màn hình đen" của game (Hệ thống > Hiển Thị: ngừng vẽ, game vẫn chạy, nhẹ máy nhất khi treo)
   cho mọi khung đang bật. Nút hiện BẬT khi có khung đang đen; bấm vào khung đen để bật lại riêng khung đó (nút tự cập nhật). Game tự nhớ lựa chọn
   trong `localStorage` của khung (khóa `jxidle_ui`) nên tải lại khung vẫn giữ nguyên. Agent mở thẻ Hệ thống một lần chạy để tích ô `#uBlack` rồi trả lại thẻ cũ.
