@@ -65,6 +65,7 @@ function createWindow() {
       sandbox: true,
       nodeIntegration: false,
       webviewTag: true,
+      backgroundThrottling: false, // hẹn giờ chạy trong trang quản lý nên không được làm chậm khi cửa sổ thu nhỏ / bị che
     },
   });
   const wc = win.webContents;

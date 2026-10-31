@@ -48,6 +48,16 @@
   #pxDlg .pxrow .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
   #pxDlg .pxrow .ms { flex:none; font-size:12px; color:var(--dim); }
   #pxDlg .pxrow .ms.ok { color:#5fd38d; } #pxDlg .pxrow .ms.warn { color:#e0b341; } #pxDlg .pxrow .ms.bad { color:#ef6b6b; }
+  #scDlg { background:var(--panel); color:var(--text); border:1px solid var(--accent); border-radius:8px; padding:10px; width:min(440px,94vw); }
+  #scDlg::backdrop { background:rgba(0,0,0,.6); }
+  #scDlg .hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  #scDlg h4 { margin:10px 0 4px; font-size:12px; color:var(--dim); font-weight:600; }
+  #scDlg .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  #scDlg label { display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; }
+  #scDlg .times { display:flex; flex-direction:column; gap:4px; }
+  #scDlg .time { display:flex; gap:6px; align-items:center; }
+  #scDlg .info { margin-top:10px; font-size:12px; color:var(--dim); line-height:1.5; white-space:pre-line; }
+  #scDlg .ft { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
   #crDlg { background:var(--panel); color:var(--text); border:1px solid var(--accent); border-radius:8px; padding:10px; width:min(380px,94vw); }
   #crDlg::backdrop { background:rgba(0,0,0,.6); }
   #crDlg .hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
@@ -119,6 +129,7 @@
   <span class="grow"></span>
   <button id="updNow" title="Kiểm tra bản mới trên GitHub ngay (không cần chờ thông báo) và cập nhật nếu có">⬆ Cập nhật</button>
   <button id="logBtn" title="Nhật ký hoạt động của từng nhân vật: cấp tăng, ngân lượng kiếm được trong ngày, đồ đáng chú ý">📒 Nhật ký <small id="logBadge"></small></button>
+  <button id="schedBtn" title="Hẹn giờ tự động chạy Phó Bản + Nhiệm Vụ + mua lệnh bài Dã Tẩu rồi quay về Leo Tháp">⏰ Hẹn giờ: TẮT</button>
   <button id="blackBtn" title="Bật / tắt màn hình đen cho tất cả khung: game ngừng vẽ nhưng vẫn chạy, nhẹ máy nhất khi treo. Bấm vào khung đen để bật lại khung đó.">🌑 Màn hình đen: TẮT</button>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </aside>
@@ -1298,6 +1309,166 @@
   };
   document.getElementById("logPanel").onclick = (e) => { if (e.target.id === "logPanel") e.target.hidden = true; };
   setInterval(() => { if (!document.getElementById("logPanel").hidden) renderLog(); }, 5000);
+
+  // --- Hẹn giờ: tự chạy Phó Bản + Nhiệm Vụ + mua lệnh bài Dã Tẩu rồi về Leo Tháp (hoặc Luyện Công) ---
+  // Chạy ngay trong trang quản lý nên phải để ứng dụng mở. Đến giờ, mỗi khung đang bật và đã vào game nhận một lệnh "combo" (agent làm tuần tự và tự mua lệnh bài khi hết việc);
+  // khung chưa vào game thì thử lại trong 10 phút (ví dụ đang tự đăng nhập lại), quá thì bỏ qua lần đó. Mỗi giờ hẹn chỉ chạy một lần mỗi ngày.
+  const SCHED_GRACE_MS = 10 * 60 * 1000;
+  const DAY_NAMES = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+  const schedDefault = () => ({ on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], dg: true, quest: true, buy: true, after: "tower", slots: null, last: {} });
+  state.sched = Object.assign(schedDefault(), state.sched || {});
+  const sc = () => state.sched;
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const dayKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  const schedAt = (day, t) => { const [h, m] = String(t).split(":").map(Number); return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0, 0); };
+  const schedSteps = () => [sc().dg && "Phó Bản", sc().buy && "mua lệnh bài Dã Tẩu", sc().quest && "Nhiệm Vụ"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
+  function schedNext() {
+    const now = new Date();
+    let best = null;
+    for (let d = 0; d < 8; d++) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + d);
+      if (!sc().days[day.getDay()]) continue;
+      for (const t of sc().times) {
+        const at = schedAt(day, t);
+        if (at > now && (!best || at < best)) best = at;
+      }
+    }
+    return best;
+  }
+  function renderSched() {
+    const b = document.getElementById("schedBtn");
+    b.textContent = "⏰ Hẹn giờ: " + (sc().on && sc().times.length ? sc().times.join(", ") : "TẮT");
+    b.classList.toggle("on", !!sc().on);
+    const nx = sc().on ? schedNext() : null;
+    b.title = "Hẹn giờ tự động chạy " + schedSteps().join(" → ") + (nx ? ". Lần chạy kế: " + DAY_NAMES[nx.getDay()] + " " + pad2(nx.getDate()) + "/" + pad2(nx.getMonth() + 1) + " " + pad2(nx.getHours()) + ":" + pad2(nx.getMinutes()) : "");
+  }
+  // Khung nào chạy: các khung đang bật (và đã chọn trong hộp hẹn giờ). Trả về các khung đã gửi lệnh
+  function schedLaunch(pending) {
+    const done = [];
+    for (const i of [...pending]) {
+      const s = state.slots[i];
+      if (!s || !s.on) { pending.delete(i); continue; }
+      if (!live[i] || !live[i].ready) continue;
+      ensureGrid("combo");
+      s.desired = sc().after === "tower" ? "tower" : "farm"; // nếu khung tải lại giữa chừng thì về thẳng chế độ cuối, không chạy lại từ đầu
+      s.pet = false;
+      save();
+      refresh(i);
+      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", steps: [sc().dg && "dg", sc().buy && "ldt", sc().quest && "quest"].filter(Boolean) });
+      pending.delete(i);
+      done.push(i);
+    }
+    return done;
+  }
+  const schedTargets = () => state.slots.map((s, i) => (s.on && (!sc().slots || sc().slots.includes(s.p)) ? i : -1)).filter((i) => i >= 0);
+  const schedPending = {}; // giờ hẹn đang chờ khung vào game: key -> { set: Set(chỉ số khung), until }
+  function schedStart(key, label) {
+    const set = new Set(schedTargets());
+    if (!set.size) { logToast("Hẹn giờ", label + ": không có khung nào đang bật để chạy"); return; }
+    const done = schedLaunch(set);
+    logToast("Hẹn giờ", label + ": bắt đầu " + schedSteps().join(" → ") + " ở " + done.length + " khung" + (set.size ? " (" + set.size + " khung chưa vào game, thử lại trong 10 phút)" : ""));
+    if (set.size) schedPending[key] = { set, until: Date.now() + SCHED_GRACE_MS, label };
+  }
+  function schedTick() {
+    const now = Date.now();
+    for (const [key, p] of Object.entries(schedPending)) {
+      const done = schedLaunch(p.set);
+      if (done.length) logToast("Hẹn giờ", p.label + ": khung " + done.map((i) => i + 1).join(", ") + " đã vào game, bắt đầu chạy");
+      if (!p.set.size) delete schedPending[key];
+      else if (now > p.until) {
+        logToast("Hẹn giờ", p.label + ": khung " + [...p.set].map((i) => i + 1).join(", ") + " không vào game kịp, bỏ qua lần này");
+        delete schedPending[key];
+      }
+    }
+    if (!sc().on) return;
+    const today = new Date();
+    for (let back = 0; back <= 1; back++) { // hôm qua cũng xét để giờ hẹn sát nửa đêm không bị lỡ khi mở lại ứng dụng
+      const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() - back);
+      if (!sc().days[day.getDay()]) continue;
+      for (const t of sc().times) {
+        const at = schedAt(day, t).getTime();
+        const key = dayKey(day) + " " + t;
+        if (now >= at && now - at <= SCHED_GRACE_MS && !sc().last[key]) {
+          sc().last[key] = now;
+          for (const k of Object.keys(sc().last)) if (now - sc().last[k] > 3 * 86400000) delete sc().last[k];
+          save();
+          schedStart(key, "Giờ hẹn " + t);
+        }
+      }
+    }
+    renderSched();
+  }
+  setInterval(schedTick, 15000);
+
+  const scDlg = document.createElement("dialog");
+  scDlg.id = "scDlg";
+  document.body.appendChild(scDlg);
+  function scRender() {
+    const c = sc();
+    const days = DAY_NAMES.map((n, k) => [k, n]);
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    scDlg.innerHTML =
+      '<div class="hd"><b>⏰ Hẹn giờ tự động chạy</b><button class="sm" data-s="close" title="Đóng">✕</button></div>' +
+      '<label><input type="checkbox" data-s="on"' + (c.on ? " checked" : "") + '> <b>Bật hẹn giờ</b></label>' +
+      '<h4>Giờ chạy (theo giờ máy này)</h4><div class="times">' +
+      c.times.map((t, k) => '<div class="time"><input type="time" data-s="time" data-k="' + k + '" value="' + t + '"><button class="sm" data-s="deltime" data-k="' + k + '" title="Bỏ giờ này">✕</button></div>').join("") +
+      '</div><div class="row" style="margin-top:6px"><button class="sm" data-s="addtime"' + (c.times.length >= 6 ? " disabled" : "") + '>＋ Thêm giờ</button></div>' +
+      '<h4>Các ngày trong tuần</h4><div class="row">' + order.map((k) => '<label><input type="checkbox" data-s="day" data-k="' + k + '"' + (c.days[k] ? " checked" : "") + '> ' + DAY_NAMES[k] + '</label>').join("") + '</div>' +
+      '<h4>Các việc, làm tuần tự</h4><div class="row">' +
+      '<label><input type="checkbox" data-s="dg"' + (c.dg ? " checked" : "") + '> Phó Bản</label>' +
+      '<label title="Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác"><input type="checkbox" data-s="buy"' + (c.buy ? " checked" : "") + '> Mua lệnh bài Dã Tẩu</label>' +
+      '<label><input type="checkbox" data-s="quest"' + (c.quest ? " checked" : "") + '> Nhiệm Vụ</label></div>' +
+      '<div class="row" style="margin-top:6px"><span style="font-size:13px">Xong thì về:</span><select data-s="after"><option value="tower"' + (c.after === "tower" ? " selected" : "") + '>Leo Tháp</option><option value="farm"' + (c.after !== "tower" ? " selected" : "") + '>Luyện Công</option></select></div>' +
+      '<h4>Áp dụng cho các khung</h4><div class="row">' +
+      state.slots.map((s, i) => '<label><input type="checkbox" data-s="slot" data-p="' + s.p + '"' + (!c.slots || c.slots.includes(s.p) ? " checked" : "") + '> Khung ' + (i + 1) + '</label>').join("") + '</div>' +
+      '<div class="info"></div>' +
+      '<div class="ft"><button class="sm" data-s="now">▶ Chạy thử ngay</button></div>';
+    scInfo();
+  }
+  function scInfo() {
+    const nx = sc().on ? schedNext() : null;
+    scDlg.querySelector(".info").textContent =
+      "Trình tự: " + schedSteps().join(" → ") + ".\n" +
+      (sc().on ? (nx ? "Lần chạy kế: " + DAY_NAMES[nx.getDay()] + " " + pad2(nx.getDate()) + "/" + pad2(nx.getMonth() + 1) + " lúc " + pad2(nx.getHours()) + ":" + pad2(nx.getMinutes()) + "." : "Chưa có giờ / ngày nào được chọn.") : "Đang tắt.") +
+      "\nChỉ chạy khi ứng dụng đang mở, và chỉ với khung đang bật và đã vào game (khung chưa vào game được thử lại trong 10 phút).";
+  }
+  scDlg.onchange = (e) => {
+    const x = e.target.closest("[data-s]");
+    if (!x) return;
+    const c = sc(), k = parseInt(x.dataset.k, 10);
+    switch (x.dataset.s) {
+      case "on": c.on = x.checked; break;
+      case "time": if (/^\d{2}:\d{2}$/.test(x.value)) c.times[k] = x.value; break;
+      case "day": c.days[k] = x.checked ? 1 : 0; break;
+      case "dg": case "quest": case "buy": c[x.dataset.s] = x.checked; break;
+      case "after": c.after = x.value === "tower" ? "tower" : "farm"; break;
+      case "slot": {
+        const all = state.slots.map((s) => s.p), cur = new Set(c.slots || all);
+        x.checked ? cur.add(+x.dataset.p) : cur.delete(+x.dataset.p);
+        c.slots = all.every((p) => cur.has(p)) ? null : [...cur];
+        break;
+      }
+    }
+    save();
+    renderSched();
+    scInfo();
+  };
+  scDlg.onclick = (e) => {
+    const x = e.target.closest("[data-s]");
+    if (e.target === scDlg || (x && x.dataset.s === "close")) return scDlg.close();
+    if (!x) return;
+    const c = sc();
+    if (x.dataset.s === "addtime" && c.times.length < 6) { c.times.push("12:00"); save(); renderSched(); scRender(); }
+    else if (x.dataset.s === "deltime") { c.times.splice(parseInt(x.dataset.k, 10), 1); save(); renderSched(); scRender(); }
+    else if (x.dataset.s === "now") {
+      if (!schedTargets().length) { logToast("Hẹn giờ", "Không có khung nào đang bật"); return; }
+      if (!confirm("Chạy ngay: " + schedSteps().join(" → ") + " ở " + schedTargets().length + " khung đang bật?" + (c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : ""))) return;
+      scDlg.close();
+      schedStart("manual " + Date.now(), "Chạy thử");
+    }
+  };
+  document.getElementById("schedBtn").onclick = () => { scRender(); scDlg.showModal(); };
+  renderSched();
 
   // Màn hình đen cho cả các khung đang bật. Khung đã đen thì lần bấm sau tắt hết; game tự nhớ lựa chọn nên tải lại khung vẫn giữ.
   const blackBtn = document.getElementById("blackBtn");
