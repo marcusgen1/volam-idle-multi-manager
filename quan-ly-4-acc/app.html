@@ -111,6 +111,7 @@
   <span class="grow"></span>
   <button id="updNow" title="Kiểm tra bản mới trên GitHub ngay (không cần chờ thông báo) và cập nhật nếu có">⬆ Cập nhật</button>
   <button id="logBtn" title="Nhật ký hoạt động của từng nhân vật: cấp tăng, ngân lượng kiếm được trong ngày, đồ đáng chú ý">📒 Nhật ký <small id="logBadge"></small></button>
+  <button id="profBtn" title="Mở mỗi tài khoản trong một cửa sổ Chrome riêng (hồ sơ riêng acc1…acc5) chạy trang game chính thức. Game bản mới không chạy trong khung của trang này nữa.">🪟 Mở Chrome riêng</button>
   <button id="blackBtn" title="Bật / tắt màn hình đen cho tất cả khung: game ngừng vẽ nhưng vẫn chạy, nhẹ máy nhất khi treo. Bấm vào khung đen để bật lại khung đó.">🌑 Màn hình đen: TẮT</button>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
 </aside>
@@ -1173,6 +1174,16 @@
     forOn((i) => post(i, { type: "black", on }));
   };
   renderBlack();
+  // Game bản mới chỉ chạy ở tên miền chính thức, nên mỗi tài khoản một hồ sơ Chrome riêng (không dùng chung phiên đăng nhập)
+  document.getElementById("profBtn").onclick = async () => {
+    if (!confirm("Mở " + state.slots.length + " cửa sổ Chrome, mỗi tài khoản một hồ sơ riêng (acc1…)?\nHồ sơ nào đã đăng nhập sẽ giữ phiên cũ.")) return;
+    try {
+      for (const s of state.slots) await pxPost("/__profile", { slot: s.p });
+      logToast("Chrome", "Đã mở " + state.slots.length + " cửa sổ Chrome riêng");
+    } catch (e) {
+      logToast("Chrome", e.message);
+    }
+  };
   document.getElementById("reloadAll").onclick = () => state.slots.forEach((s, i) => s.on && mount(i, true));
   afterCountChange();
 })();

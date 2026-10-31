@@ -441,8 +441,29 @@ function proxyApi(req, res, url) {
   });
 }
 
+// Mở cửa sổ Chrome riêng (mỗi tài khoản một hồ sơ) bằng mo-4-cua-so.sh: body { slot: 1..5 } mở một cửa sổ, không có slot mở cả 5. Chỉ trên Linux / macOS.
+function profileApi(req, res) {
+  const send = (code, obj) => {
+    res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify(obj));
+  };
+  if (req.method !== "POST" || !trusted(req)) return send(403, { error: "forbidden" });
+  if (process.platform === "win32") return send(501, { error: "Trên Windows hãy chạy mo-4-cua-so.bat" });
+  readBody(req).then((b) => {
+    const slot = parseInt(b.slot, 10);
+    const args = [path.join(__dirname, "mo-4-cua-so.sh")];
+    if (slot >= 1 && slot <= 5) args.push(String(slot));
+    else if (b.slot != null && b.slot !== "") return send(400, { error: "Khung không hợp lệ" });
+    const child = require("child_process").spawn("bash", args, { detached: true, stdio: "ignore" });
+    child.on("error", () => {});
+    child.unref();
+    send(200, { ok: true });
+  });
+}
+
 function dashboard(req, res) {
   const url = req.url.split("?")[0];
+  if (url === "/__profile") return profileApi(req, res);
   if (url.startsWith("/__proxy")) return proxyApi(req, res, url);
   if (url.startsWith("/__update")) {
     updateApi(req, res, url);

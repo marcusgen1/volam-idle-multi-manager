@@ -13,7 +13,7 @@ kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xa
 | `quan-ly-4-acc/app.html` | Trang quản lý (giao diện) |
 | `quan-ly-4-acc/agent.js` | Script được chèn vào từng khung game để điều khiển chế độ chơi |
 | `quan-ly-4-acc/chay-quan-ly.bat` / `.sh` | Chạy máy chủ + mở trang (Windows / Linux, macOS) |
-| `quan-ly-4-acc/mo-4-cua-so.ps1` `.bat` / `.sh` | Phương án khác: 4 cửa sổ Chrome riêng (Windows / Linux) |
+| `quan-ly-4-acc/mo-4-cua-so.ps1` `.bat` / `.sh` | Mỗi tài khoản một cửa sổ Chrome riêng chạy game chính thức (`.sh`: 5 cửa sổ, có proxy khung 5; `.ps1` / `.bat` Windows: 4 cửa sổ) |
 
 ## Chạy trang quản lý
 
@@ -83,17 +83,25 @@ Giữ lệnh trên chạy, rồi mở <http://127.0.0.1:8800/> trên máy của 
 (ví dụ `tmux new -s volam` rồi `npm start`).
 **Không** mở các cổng này ra Internet: máy chủ không có mật khẩu và chuyển tiếp trực tiếp tới game.
 
-### 4. (Tùy chọn) 4 cửa sổ Chrome / Chromium riêng
+### 4. Cửa sổ Chrome / Chromium riêng cho từng tài khoản (khuyên dùng với game bản mới)
+
+Game bản mới (từ v1019) chỉ chạy ở tên miền chính thức `volamidle.pages.dev` và từ chối chạy qua `127.0.0.1` như các khung của trang quản lý
+("Võ Lâm Idle chỉ chơi online"). Bấm liên kết trong khung sẽ đưa các khung về cùng một địa chỉ nên dùng chung phiên đăng nhập và đè nhân vật lên nhau.
+Vì vậy mỗi tài khoản nên chạy trong **một hồ sơ Chrome riêng**:
 
 ```bash
-./quan-ly-4-acc/mo-4-cua-so.sh            # mở cả 4, xếp 2x2
+./quan-ly-4-acc/mo-4-cua-so.sh            # mở cả 5 (3 cửa sổ trên + 2 dưới)
 ./quan-ly-4-acc/mo-4-cua-so.sh 2          # chỉ cửa sổ số 2
+VL_COUNT=4 ./quan-ly-4-acc/mo-4-cua-so.sh # chỉ 4 cửa sổ, xếp 2x2
 ./quan-ly-4-acc/mo-4-cua-so.sh --dry-run  # chỉ in lệnh, không mở
 ```
 
+Hoặc bấm **🪟 Mở Chrome riêng** ở cột trái trang quản lý (Linux / macOS; Windows dùng `mo-4-cua-so.bat`).
 Cần `google-chrome`, `chromium` hoặc `chromium-browser`. Muốn xếp đúng theo cỡ màn hình, cài thêm `xdpyinfo`
-(`x11-utils`) hoặc `xrandr`; không có thì dùng 1920×1080. Hồ sơ lưu ở `~/.local/share/VolamProfiles/acc1…acc4`,
-nên lần sau game nhớ đăng nhập. Phương án này không dùng trang quản lý ở trên.
+(`x11-utils`) hoặc `xrandr`; không có thì dùng 1920×1080. Hồ sơ lưu ở `~/.local/share/VolamProfiles/acc1…acc5`,
+nên lần sau game nhớ đăng nhập. **Cửa sổ 5 đi qua proxy** ghi ở `proxy.json` (khóa `5`, dạng `http://host:port` hoặc `socks5://host:port`; proxy có user:pass thì Chrome tự hỏi,
+SOCKS5 có mật khẩu Chrome không hỗ trợ). Các cửa sổ này chạy game chính thức nên **không** có nút điều khiển (Luyện công, Bán đồ, Màn hình đen…) của trang quản lý.
+Game vẫn giới hạn số tài khoản mỗi máy / mỗi mạng theo quy định của nó.
 
 ### Gỡ lỗi thường gặp
 
