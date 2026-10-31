@@ -5,6 +5,7 @@ const { contextBridge, ipcRenderer, webFrame } = require("electron");
 contextBridge.exposeInMainWorld("__vlBridge", {
   post: (m) => ipcRenderer.sendToHost("vl", m),
   on: (cb) => ipcRenderer.on("vl", (_e, m) => cb(m)),
+  loginScreen: () => ipcRenderer.send("vl:login-screen"),
 });
 // Trong khung nhúng, outerWidth / outerHeight của trang là cỡ cả cửa sổ ứng dụng chứ không phải cỡ khung, nên lệch với innerWidth / innerHeight rất xa.
 // Game dùng độ lệch này để đoán DevTools đang mở (và ghi cờ "f12" lên máy chủ), mà ứng dụng không có DevTools. Cho hai giá trị bằng đúng cỡ khung

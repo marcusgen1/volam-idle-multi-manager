@@ -1871,7 +1871,29 @@
     if (Date.now() - heroAt >= HERO_RETRY_MS) peekHeroName();
   };
 
+  // Màn đăng nhập (#ngU / #ngP / #ngIn): thấy liên tục LOGIN_WAIT_MS mà không ai gõ phím thì báo cho ứng dụng (nếu khung này có lưu tài khoản
+  // và bật tự đăng nhập thì ứng dụng điền form). Chỉ chạy trong ứng dụng desktop. Bạn đang gõ (phím bấm trong vài giây qua) hoặc ô mật khẩu đã có chữ thì bỏ qua.
+  const LOGIN_WAIT_MS = 4000;
+  const LOGIN_RETRY_MS = 20000;
+  let loginSeen = 0;
+  let loginSent = 0;
+  let lastKeyAt = 0;
+  if (BR && BR.loginScreen) document.addEventListener("keydown", () => { lastKeyAt = Date.now(); }, true);
+  const loginWatch = () => {
+    if (!BR || !BR.loginScreen) return;
+    const pw = q("#ngP");
+    if (!pw || !q("#ngIn")) { loginSeen = 0; return; }
+    if (pw.value || Date.now() - lastKeyAt < 8000) { loginSeen = 0; return; }
+    const now = Date.now();
+    if (!loginSeen) loginSeen = now;
+    if (now - loginSeen >= LOGIN_WAIT_MS && now - loginSent >= LOGIN_RETRY_MS) {
+      loginSent = now;
+      BR.loginScreen();
+    }
+  };
+
   function tick() {
+    loginWatch();
     if (!q("#mswMenu")) {
       // Chưa đăng nhập / đã đăng xuất: quên tên cũ để lần đăng nhập sau (có thể là nhân vật khác) đọc lại
       heroName = "";
