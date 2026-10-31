@@ -37,6 +37,8 @@
   let desired = null; // chế độ muốn giữ, null = không điều khiển
   let queue = []; // các việc còn lại của "Chạy tất cả" (sau việc đang làm)
   let comboAfter = "farm"; // chế độ sau khi "Chạy PB + NV" xong hết: "farm" (Luyện Công) hoặc "tower" (Leo Tháp)
+  let comboBuy = false; // chạy hẹn giờ: sau khi hết các việc thì mua lệnh bài Dã Tẩu rồi mới sang comboAfter
+  let comboRun = 0; // số thứ tự lần chạy combo hiện tại; bạn chọn chế độ khác trong lúc đang mua thì lần mua đó không kéo khung về comboAfter nữa
   let note = ""; // lý do lần tự chuyển gần nhất (báo cho trang quản lý)
   let applied = true; // đã bấm chuyển sang desired chưa
   let tries = 0;
@@ -109,6 +111,11 @@
       return;
     }
     const next = comboAfter === "tower" ? "tower" : "farm";
+    if (comboBuy) {
+      comboBuy = false;
+      buyThenGo(next, "Hết " + label + ": " + why);
+      return;
+    }
     console.log("[VL] Hết " + label + " (" + why + ") -> " + (next === "tower" ? "Leo Tháp" : "về Luyện Công"));
     desired = next;
     farmSince = 0;
@@ -116,6 +123,33 @@
     resetWork();
     clickMode(next);
     report(true, true);
+  };
+  // Lần chạy hẹn giờ: về Luyện Công trong lúc mua lệnh bài Dã Tẩu (cửa sổ game bận thì thử lại vài lần), xong mới sang chế độ cuối (Leo Tháp / Luyện Công)
+  const buyThenGo = (next, why) => {
+    const run = comboRun;
+    note = why + " → mua lệnh bài Dã Tẩu";
+    desired = "farm";
+    farmSince = 0;
+    tries = 0;
+    resetWork();
+    clickMode("farm");
+    report(true, true);
+    (async () => {
+      for (let t = 0; t < 6 && run === comboRun; t++) {
+        await runPd("ldt", {});
+        if (!/đang mở cửa sổ khác|Chưa vào game/.test(pdMsg)) break;
+        await wait(10000);
+      }
+      if (run !== comboRun) return; // bạn đã chọn chế độ khác
+      note = "Đã mua lệnh bài Dã Tẩu → " + (next === "tower" ? "Leo Tháp" : "Luyện Công");
+      console.log("[VL] " + note);
+      desired = next;
+      farmSince = 0;
+      tries = 0;
+      resetWork();
+      clickMode(next);
+      report(true, true);
+    })().catch(() => {});
   };
   const curMode = () => {
     const on = q("#mswMenu [data-msw].on");
@@ -1674,10 +1708,24 @@
     if (petRun && !m.restore && m.mode !== "farm") petCancel = true; // bạn chọn chế độ khác: dừng đi bắt thú
     queue = [];
     note = "";
+    comboRun++;
+    comboBuy = false;
     comboAfter = m.mode === "combo" && m.after === "tower" ? "tower" : "farm";
     if (m.mode === "combo") {
-      queue = COMBO.slice(1);
-      desired = COMBO[0];
+      // steps (hẹn giờ): danh sách việc cần chạy, bỏ trống thì mặc định Phó Bản rồi Nhiệm Vụ. buy: mua lệnh bài Dã Tẩu sau khi hết việc.
+      const steps = Array.isArray(m.steps) ? COMBO.filter((x) => m.steps.includes(x)) : COMBO;
+      comboBuy = !!m.buy;
+      if (steps.length) {
+        queue = steps.slice(1);
+        desired = steps[0];
+      } else if (comboBuy) {
+        comboBuy = false;
+        explicit = false;
+        buyThenGo(comboAfter, "Hẹn giờ");
+        return;
+      } else {
+        desired = comboAfter;
+      }
     } else {
       desired = m.mode;
     }
@@ -1704,6 +1752,8 @@
       const b = e.target.closest("#mswMenu [data-msw], [data-mode]");
       if (!b) return;
       desired = b.dataset.msw || b.dataset.mode;
+      comboRun++; // bạn tự chọn: hủy phần "mua lệnh bài rồi về ..." của lần chạy hẹn giờ đang dở
+      comboBuy = false;
       queue = [];
       note = "";
       applied = true;
