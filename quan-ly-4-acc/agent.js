@@ -132,7 +132,7 @@
     (async () => {
       for (let t = 0; t < 6 && run === comboRun; t++) {
         await runPd("ldt", {});
-        if (!/đang mở cửa sổ khác|Chưa vào game/.test(pdMsg)) break;
+        if (!/đang mở cửa sổ khác|Chưa vào game|game không phản hồi/.test(pdMsg)) break; // khung chậm (proxy xa): mở lại Kỳ Trân Các thử lần nữa
         await wait(10000);
       }
       if (run !== comboRun) return; // bạn đã chọn chế độ khác
@@ -1136,9 +1136,11 @@
           const s2 = status();
           if (s2 && s2.used > before) return s2;
           return TOAST_ERR.test(toast) ? { err: toast } : null; // game báo lỗi (thiếu KNB khóa, đạt giới hạn…)
-        }, 15000);
+        }, 25000);
         if (!after) {
-          stop = toast || "game không phản hồi";
+          // kèm chữ trên card để biết game đang hiện gì (khung chậm hay card không có "Hôm nay X/Y")
+          const c = card();
+          stop = toast || "game không phản hồi (card: " + (c ? c.textContent.replace(/\s+/g, " ").trim().slice(0, 90) : "không thấy") + (b10 ? ", ×10 " + (b10.disabled ? "khóa" : "mở") : "") + ")";
           break;
         }
         if (after.err) {
