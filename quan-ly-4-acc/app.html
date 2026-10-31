@@ -1315,13 +1315,13 @@
   // khung chưa vào game thì thử lại trong 10 phút (ví dụ đang tự đăng nhập lại), quá thì bỏ qua lần đó. Mỗi giờ hẹn chỉ chạy một lần mỗi ngày.
   const SCHED_GRACE_MS = 10 * 60 * 1000;
   const DAY_NAMES = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
-  const schedDefault = () => ({ on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], dg: true, quest: true, buy: true, after: "tower", slots: null, last: {} });
+  const schedDefault = () => ({ on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], sell: true, dg: true, quest: true, buy: true, after: "tower", slots: null, last: {} });
   state.sched = Object.assign(schedDefault(), state.sched || {});
   const sc = () => state.sched;
   const pad2 = (n) => String(n).padStart(2, "0");
   const dayKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   const schedAt = (day, t) => { const [h, m] = String(t).split(":").map(Number); return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0, 0); };
-  const schedSteps = () => [sc().dg && "Phó Bản", sc().buy && "mua lệnh bài Dã Tẩu", sc().quest && "Nhiệm Vụ"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
+  const schedSteps = () => [sc().sell && "bán đồ xanh + HK cơ bản", sc().dg && "Phó Bản", sc().buy && "mua lệnh bài Dã Tẩu", sc().quest && "Nhiệm Vụ"].filter(Boolean).concat(sc().after === "tower" ? "Leo Tháp" : "Luyện Công");
   function schedNext() {
     const now = new Date();
     let best = null;
@@ -1354,7 +1354,7 @@
       s.pet = false;
       save();
       refresh(i);
-      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", steps: [sc().dg && "dg", sc().buy && "ldt", sc().quest && "quest"].filter(Boolean) });
+      post(i, { type: "setMode", mode: "combo", restore: false, after: sc().after === "tower" ? "tower" : "farm", kept: !!state.sellKept, steps: [sc().sell && "sell", sc().dg && "dg", sc().buy && "ldt", sc().quest && "quest"].filter(Boolean) });
       pending.delete(i);
       done.push(i);
     }
@@ -1415,6 +1415,7 @@
       '</div><div class="row" style="margin-top:6px"><button class="sm" data-s="addtime"' + (c.times.length >= 6 ? " disabled" : "") + '>＋ Thêm giờ</button></div>' +
       '<h4>Các ngày trong tuần</h4><div class="row">' + order.map((k) => '<label><input type="checkbox" data-s="day" data-k="' + k + '"' + (c.days[k] ? " checked" : "") + '> ' + DAY_NAMES[k] + '</label>').join("") + '</div>' +
       '<h4>Các việc, làm tuần tự</h4><div class="row">' +
+      '<label title="Trước khi chạy: bán đồ xanh rồi bán HK cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) để có chỗ trống trong hành trang. Giữ món khóa 🔒, đồ đang mặc, món cường hóa. Không hoàn tác"><input type="checkbox" data-s="sell"' + (c.sell ? " checked" : "") + '> Bán đồ xanh + HK cơ bản</label>' +
       '<label><input type="checkbox" data-s="dg"' + (c.dg ? " checked" : "") + '> Phó Bản</label>' +
       '<label title="Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác"><input type="checkbox" data-s="buy"' + (c.buy ? " checked" : "") + '> Mua lệnh bài Dã Tẩu</label>' +
       '<label><input type="checkbox" data-s="quest"' + (c.quest ? " checked" : "") + '> Nhiệm Vụ</label></div>' +
@@ -1440,7 +1441,7 @@
       case "on": c.on = x.checked; break;
       case "time": if (/^\d{2}:\d{2}$/.test(x.value)) c.times[k] = x.value; break;
       case "day": c.days[k] = x.checked ? 1 : 0; break;
-      case "dg": case "quest": case "buy": c[x.dataset.s] = x.checked; break;
+      case "sell": case "dg": case "quest": case "buy": c[x.dataset.s] = x.checked; break;
       case "after": c.after = x.value === "tower" ? "tower" : "farm"; break;
       case "slot": {
         const all = state.slots.map((s) => s.p), cur = new Set(c.slots || all);
@@ -1462,7 +1463,7 @@
     else if (x.dataset.s === "deltime") { c.times.splice(parseInt(x.dataset.k, 10), 1); save(); renderSched(); scRender(); }
     else if (x.dataset.s === "now") {
       if (!schedTargets().length) { logToast("Hẹn giờ", "Không có khung nào đang bật"); return; }
-      if (!confirm("Chạy ngay: " + schedSteps().join(" → ") + " ở " + schedTargets().length + " khung đang bật?" + (c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : ""))) return;
+      if (!confirm("Chạy ngay: " + schedSteps().join(" → ") + " ở " + schedTargets().length + " khung đang bật?" + ((c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : "") + (c.sell ? "\n\nBán đồ xanh + HK cơ bản không hoàn tác." : "")))) return;
       scDlg.close();
       schedStart("manual " + Date.now(), "Chạy thử");
     }
