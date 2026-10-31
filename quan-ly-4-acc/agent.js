@@ -30,7 +30,7 @@
   const TRACKER_ALWAYS_ON = true;
   // "Chạy tất cả": lần lượt các chế độ này, xong hết thì về Luyện Công
   const COMBO = ["dg", "quest"];
-  const STEPS = ["dg", "ldt", "quest"]; // thứ tự các bước hẹn giờ
+  const STEPS = ["sell", "dg", "ldt", "quest"]; // thứ tự các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống)
   // Dòng nhật ký game ghi khi tự dời về bãi luyện công vì hết việc
   const DONE_LOG = { quest: "Hết nhiệm vụ, luyện công", dg: "Hết lượt phó bản, luyện công" };
   const TOAST_DONE = { dg: "Hết lượt phó bản" };
@@ -38,6 +38,7 @@
   let desired = null; // chế độ muốn giữ, null = không điều khiển
   let queue = []; // các việc còn lại của "Chạy tất cả" (sau việc đang làm)
   let comboAfter = "farm"; // chế độ sau khi "Chạy PB + NV" xong hết: "farm" (Luyện Công) hoặc "tower" (Leo Tháp)
+  let comboKept = false; // hẹn giờ: bước bán có gồm cả đồ xanh game đang giữ không
   let comboRun = 0; // số thứ tự lần chạy combo hiện tại; bạn chọn chế độ khác trong lúc đang mua thì lần mua đó không kéo khung đi tiếp nữa
   let note = ""; // lý do lần tự chuyển gần nhất (báo cho trang quản lý)
   let applied = true; // đã bấm chuyển sang desired chưa
@@ -116,6 +117,7 @@
   const advance = () => {
     const s = queue.shift();
     if (s === "ldt") return buyLdt();
+    if (s === "sell") return sellStep();
     if (s) {
       console.log("[VL] -> sang " + s);
       return goMode(s);
@@ -137,6 +139,25 @@
       }
       if (run !== comboRun) return; // bạn đã chọn chế độ khác
       note = "Đã mua lệnh bài Dã Tẩu";
+      advance();
+    })().catch(() => {});
+  };
+  // Lần chạy hẹn giờ: về Luyện Công, bán đồ xanh rồi bán HK cơ bản để có chỗ trống trong hành trang (cửa sổ game bận thì thử lại vài lần), xong làm tiếp việc kế
+  const sellStep = () => {
+    const run = comboRun;
+    note = (note ? note + " → " : "") + "bán đồ xanh + HK cơ bản";
+    goMode("farm");
+    (async () => {
+      const BUSY = /đang mở cửa sổ khác|Chưa vào game/;
+      for (const what of ["blue", "hk"]) {
+        for (let t = 0; t < 6 && run === comboRun; t++) {
+          const r = await runSell(false, comboKept, what);
+          if (!(r.msg && BUSY.test(r.msg)) && !(r.sold === 0 && !r.msg)) break; // r.msg rỗng = đang có lần bán khác chạy: chờ rồi thử lại
+          await wait(10000);
+        }
+      }
+      if (run !== comboRun) return; // bạn đã chọn chế độ khác
+      note = "Đã bán đồ trước khi chạy";
       advance();
     })().catch(() => {});
   };
@@ -1703,11 +1724,13 @@
     comboAfter = m.mode === "combo" && m.after === "tower" ? "tower" : "farm";
     if (m.mode === "combo") {
       // steps (hẹn giờ): danh sách việc theo thứ tự Phó Bản → mua lệnh bài ("ldt") → Nhiệm Vụ, bỏ trống thì mặc định Phó Bản rồi Nhiệm Vụ
+      comboKept = !!m.kept;
       const steps = Array.isArray(m.steps) ? STEPS.filter((x) => m.steps.includes(x)) : COMBO;
       queue = steps.slice(1);
-      if (steps[0] === "ldt") {
+      if (steps[0] === "sell" || steps[0] === "ldt") {
         explicit = false;
-        buyLdt();
+        queue = steps.slice(); // bước đầu không phải chế độ: để advance() lấy từ đầu hàng
+        advance();
         return;
       }
       desired = steps.length ? steps[0] : comboAfter;

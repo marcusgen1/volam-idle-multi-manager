@@ -138,9 +138,9 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   tự bán / bán Chợ). Giữ lại: ô 📜 (giữ cho Dã Tẩu), đồ đang mặc và đồ Bạch Kim. Gửi bằng thư thường (không phải thư giao dịch). Không thấy món nào thì báo kèm các độ hiếm đang có trong hành trang.
 - **Tài khoản và mã máy trên tên khung**: tên khung có thêm `· tk <tên tài khoản>` (đọc từ phiên đăng nhập của game trong sessionStorage của khung); rê chuột vào tên khung để xem thêm 6 ký tự đầu mã máy
   của game (`jxDev`). Dùng để nhìn ra hai khung có đang đăng nhập cùng một tài khoản hay dùng chung mã máy không.
-- **Hẹn giờ** (⏰ ở cột trái): tự chạy **Phó Bản → mua lệnh bài Dã Tẩu → Nhiệm Vụ → về Leo Tháp** (hoặc Luyện Công) vào các giờ trong ngày bạn chọn (tối đa 6 giờ, chọn ngày trong tuần, chọn khung áp dụng).
+- **Hẹn giờ** (⏰ ở cột trái): tự chạy **bán đồ xanh + HK cơ bản → Phó Bản → mua lệnh bài Dã Tẩu → Nhiệm Vụ → về Leo Tháp** (hoặc Luyện Công) vào các giờ trong ngày bạn chọn (tối đa 6 giờ, chọn ngày trong tuần, chọn khung áp dụng).
   Mỗi việc là một ô tích nên chỉ chạy phần bạn muốn (ví dụ chỉ mua lệnh bài rồi về Leo Tháp). Hộp thoại ghi sẵn "lần chạy kế" và có **▶ Chạy thử ngay**.
-  - Đến giờ, mỗi khung đang bật và đã vào game nhận lệnh "chạy tất cả" kèm danh sách việc, agent làm tuần tự: Phó Bản, rồi về Luyện Công mua hết Lệnh Bài Dã Tẩu (KNB khóa, không hoàn tác; Kỳ Trân Các đang mở bảng khác thì thử lại vài lần),
+  - Đến giờ, mỗi khung đang bật và đã vào game nhận lệnh "chạy tất cả" kèm danh sách việc, agent làm tuần tự: về Luyện Công bán đồ xanh rồi bán HK cơ bản (lấy chỗ trống hành trang; theo ô "bán cả đồ xanh game đang giữ" của bạn; không hoàn tác), Phó Bản, rồi về Luyện Công mua hết Lệnh Bài Dã Tẩu (KNB khóa, không hoàn tác; Kỳ Trân Các đang mở bảng khác thì thử lại vài lần),
     rồi Nhiệm Vụ, cuối cùng sang Leo Tháp. Bạn tự bấm đổi chế độ trong khung giữa chừng thì phần còn lại của lần đó bị hủy.
   - Chỉ chạy khi ứng dụng đang mở (cửa sổ thu nhỏ vẫn chạy). Khung chưa vào game (ví dụ đang tự đăng nhập lại) được thử lại trong 10 phút rồi bỏ qua lần đó. Mỗi giờ hẹn chỉ chạy một lần mỗi ngày;
     mở lại ứng dụng trong vòng 10 phút sau giờ hẹn vẫn chạy bù. Cấu hình lưu trong `localStorage` của ứng dụng (`state.sched`).
