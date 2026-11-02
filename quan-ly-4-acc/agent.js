@@ -30,8 +30,8 @@
   const TRACKER_ALWAYS_ON = true;
   // "Chạy tất cả": lần lượt các chế độ này, xong hết thì về Luyện Công
   const COMBO = ["dg", "quest"];
-  const STEPS = ["sell", "bgop", "bshop", "dg", "ldt", "dong", "dung", "mo", "hb", "quest"]; // các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống); thứ tự làm theo thứ tự trang quản lý gửi sang
-  const PD_STEPS = ["ldt", "bgop", "bshop", "dong", "dung", "mo", "hb"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
+  const STEPS = ["sell", "dd", "bgop", "bshop", "dg", "ldt", "dong", "dung", "mo", "hb", "quest"]; // các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống); thứ tự làm theo thứ tự trang quản lý gửi sang
+  const PD_STEPS = ["ldt", "dd", "bgop", "bshop", "dong", "dung", "mo", "hb"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
   // Dòng nhật ký game ghi khi tự dời về bãi luyện công vì hết việc
   const DONE_LOG = { quest: "Hết nhiệm vụ, luyện công", dg: "Hết lượt phó bản, luyện công" };
   const TOAST_DONE = { dg: "Hết lượt phó bản" };
@@ -1184,6 +1184,48 @@
     }
   }
 
+  // Nhận quà điểm danh ngày: 🎁 Phần thưởng (#giftBtn) > thẻ "Điểm danh" > nút #gLogin ("Nhận quà hôm nay", hoặc "Nhận bù mốc đã qua" khi
+  // có mốc 5 / 10 / 15… ngày chưa nhận). Nút khóa ("Đã nhận hôm nay") nghĩa là hôm nay xong rồi. Bấm xong game vẽ lại cửa sổ nên đọc lại nút.
+  async function pdDiemDanh() {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    const gift = q("#giftBtn");
+    if (!gift) return "không thấy nút Phần thưởng";
+    petUi = true;
+    try {
+      gift.click();
+      const tab = await waitFor(() => q('#giftTabs [data-g="login"]'), 5000);
+      if (!tab) return "không mở được cửa sổ Phần thưởng";
+      if (!tab.classList.contains("on")) {
+        tab.click();
+        await waitFor(() => q("#gLogin"), 3000);
+      }
+      const chain = () => {
+        const m = ((q("#mBody .desc") || {}).textContent || "").match(/Chuỗi\s*(\d+)\s*ngày\s*·\s*tổng\s*(\d+)\s*ngày/);
+        return m ? " (chuỗi " + m[1] + " ngày · tổng " + m[2] + " ngày)" : "";
+      };
+      const before = q("#gLogin");
+      if (!before) return "không thấy nút nhận quà điểm danh";
+      if (before.disabled) return "hôm nay đã nhận quà điểm danh rồi" + chain();
+      const got = [];
+      for (let k = 0; k < 3; k++) {
+        const b = q("#gLogin");
+        if (!b || b.disabled) break;
+        const label = b.textContent.trim();
+        b.click();
+        got.push(/bù/.test(label) ? "mốc bù" : "quà ngày");
+        await waitFor(() => { const n = q("#gLogin"); return !n || n !== b; }, 4000); // game vẽ lại cửa sổ: nút mới thay nút cũ
+        await wait(300);
+      }
+      const after = q("#gLogin");
+      if (after && !after.disabled) return "đã bấm nhận (" + got.join(" + ") + ") nhưng nút vẫn còn mở, kiểm tra lại trong game" + chain();
+      return "đã nhận " + got.join(" + ") + " điểm danh" + chain();
+    } finally {
+      petUi = false;
+      closeModalBtn();
+    }
+  }
+
   // --- Bang hội: mở cửa sổ Bang hội (nút #tabBang, chỉ hiện khi đã vào bang) rồi chuyển sang thẻ "gop" (💰 Cống hiến) hoặc "shop" (🛒 Cửa hàng) ---
   async function openBang(tab) {
     const btn = q("#tabBang");
@@ -1335,8 +1377,8 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, bgop: pdBangGop, bshop: pdBangShop, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", dd: "Điểm danh ngày", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, dd: pdDiemDanh, bgop: pdBangGop, bshop: pdBangShop, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
