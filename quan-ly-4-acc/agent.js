@@ -212,23 +212,24 @@
   let questPrepAt = 0;
   async function questPrep() {
     if (petUi || bossRun || Date.now() - questPrepAt < 60000) return;
-    if (modalOpen()) return;
-    const moreTab = q('#tabs button[data-t="more"]');
-    if (!moreTab) return;
+    if (modalOpen() || document.body.classList.contains("u20win")) return; // bạn đang mở cửa sổ (bố cục rộng vẽ thẻ thành cửa sổ nổi): để lần sau
     questPrepAt = Date.now();
     petUi = true;
     const prev = activeTab();
     const on = [];
     try {
-      if (prev !== "more") moreTab.click();
-      if (!q("#tLdt")) {
+      const side = q("#u20tt"); // bố cục rộng: nút Trợ Thủ Kiếm Hiệp ở cột bên phải mở thẳng cửa sổ nổi
+      const moreTab = q('#tabs button[data-t="more"]');
+      if (side && side.offsetParent) side.click();
+      else if (moreTab) {
+        moreTab.click();
         const tt = await waitFor(() => q("#smTt"), 3000);
         if (!tt) return;
         tt.click();
-        const fight = await waitFor(() => q('#t-more [data-tt="fight"]'), 3000);
-        if (!fight) return;
-        if (!fight.classList.contains("on")) fight.click();
-      }
+      } else return;
+      const fight = await waitFor(() => q('#t-more [data-tt="fight"]'), 3000);
+      if (!fight) return;
+      if (!fight.classList.contains("on")) fight.click();
       if (!(await waitFor(() => q("#tLdt"), 3000))) return;
       for (const [id, name] of [["tDt", "Dã Tẩu tự trả / nhận"], ["tLdt", "Tự dùng Lệnh Bài Dã Tẩu"], ["tSt", "Tự gọi Sát Thủ"], ["tGb", "Tự đi Boss Hoàng Kim"]]) {
         const el = q("#" + id);
@@ -239,10 +240,14 @@
           await wait(200);
         }
       }
-      const back = qa("#t-more button").find((x) => /‹\s*Menu/.test(x.textContent) && x.offsetParent);
-      if (back) back.click(); // về menu Hệ thống như lúc đầu
     } finally {
-      restoreTab(prev);
+      // Đóng lại như lúc đầu: bố cục rộng đóng cửa sổ nổi bằng nút ✕, bố cục hẹp về menu Hệ thống rồi trả lại thẻ cũ
+      const closeWin = () => document.body.classList.contains("u20win") && q("#u20wx") && q("#u20wx").click();
+      closeWin();
+      const back = qa("#t-more button").find((x) => /‹\s*Menu/.test(x.textContent) && x.offsetParent);
+      if (back) back.click();
+      restoreTab(prev); // thẻ chính của game (nằm sau cửa sổ nổi) cũng trả về như cũ
+      closeWin();
       petUi = false;
       if (on.length) {
         note = "Đã bật cho Nhiệm Vụ: " + on.join(", ");
