@@ -179,12 +179,17 @@ const slotOf = (wc) => {
   return 0;
 };
 
-// Điền tài khoản + mật khẩu vào form đăng nhập của game (#ngU, #ngP) rồi bấm Đăng nhập (#ngIn), như bạn tự gõ
+// Điền tài khoản + mật khẩu vào form đăng nhập của game (#ngU, #ngP) rồi bấm Đăng nhập (#ngIn), như bạn tự gõ (nếu đang ở màn menu thì bấm #ngStart trước)
 async function fillLogin(wc, c) {
   const pw = decPw(c);
   if (!pw) return "no-password";
-  const code = "(" + (function (u, p) {
+  const code = "(" + (async function (u, p) {
     const q = (s) => document.querySelector(s);
+    // Game mới: vào trang là màn menu (Bắt Đầu Trò Chơi / Đăng Ký / Quên Mật Mã), bấm [Bắt Đầu Trò Chơi] thì form đăng nhập mới hiện
+    if (!q("#ngU") && q("#ngStart")) {
+      q("#ngStart").click();
+      for (let i = 0; i < 30 && !q("#ngU"); i++) await new Promise((r) => setTimeout(r, 100));
+    }
     const U = q("#ngU"), P = q("#ngP"), B = q("#ngIn");
     if (!U || !P || !B) return "no-form";
     const set = (el, v) => {
