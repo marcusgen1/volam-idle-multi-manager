@@ -1210,9 +1210,17 @@
     return true;
   };
   // Góp ngân lượng vào quỹ bang (+1 cống hiến / 1 vạn lượng; KHÔNG dùng KNB): thẻ Cống hiến > ô số vạn lượng #bhGopV > [Góp].
-  // Mỗi ngày góp tối đa BGOP_MAX_VAN vạn (m.max đổi được), cũng không quá giới hạn của game ("Hôm nay X / Y vạn") và số lượng đang có
-  // ("có thể góp / đổi Z vạn"). Đọc ba số đó từ chữ trên thẻ rồi góp một lần, sau đó đọc lại để báo số đã góp.
+  // Mỗi ngày góp tối đa BGOP_MAX_VAN vạn (m.max đổi được), cũng không quá giới hạn của game và số ngân lượng đang có.
+  // Chữ trên thẻ ("Hôm nay X / Y vạn · có thể góp / đổi Z vạn") do game rút gọn số: 15000 → "15.0k", 1500000 → "1.50M". Nên:
+  // số còn góp được hôm nay lấy chính xác từ thuộc tính max của ô nhập; Y và Z đọc từ chữ rồi trừ nửa bước làm tròn (không bao giờ vượt);
+  // góp xong đọc lại và góp tiếp phần lẻ còn lại (tối đa 4 lượt).
   const BGOP_MAX_VAN = 15000;
+  const parseC = (str) => {
+    const m = String(str || "").trim().match(/^([\d.]+)\s*([kMB])?$/);
+    if (!m) return null;
+    const mult = { k: 1e3, M: 1e6, B: 1e9 }[m[2]] || 1, dec = (m[1].split(".")[1] || "").length, v = parseFloat(m[1]) * mult;
+    return { v: Math.round(v), lo: m[2] ? Math.floor(v - (mult / Math.pow(10, dec)) / 2) : Math.round(v) }; // lo: giá trị chắc chắn không vượt quá số thật
+  };
   async function pdBangGop(m) {
     if (!q("#mswMenu")) return "Chưa vào game";
     if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
@@ -1221,34 +1229,49 @@
       const o = await openBang("gop");
       if (o.err) return o.err;
       const info = () => {
-        let el = q("#bhGopV");
+        const inp = q("#bhGopV");
+        let el = inp;
         while (el && el.parentElement && !/Hôm nay/.test(el.textContent)) el = el.parentElement;
         const t = el ? el.textContent.replace(/\s+/g, " ") : "";
-        const a = t.match(/Hôm nay\s*([\d.,]+)\s*\/\s*([\d.,]+)\s*vạn/);
-        const z = t.match(/có thể góp\s*\/\s*đổi\s*([\d.,]+)\s*vạn/);
-        return a ? { used: digits(a[1]), cap: digits(a[2]), can: z ? digits(z[1]) : Infinity, txt: t } : null;
+        const a = t.match(/Hôm nay\s*(\S+)\s*\/\s*(\S+)\s*vạn/);
+        const z = t.match(/có thể góp\s*\/\s*đổi\s*(\S+)\s*vạn/);
+        const cap = a && parseC(a[2]);
+        const can = z && parseC(z[1]);
+        const left = inp && inp.max !== "" ? Math.max(0, Math.floor(+inp.max)) : cap && a && parseC(a[1]) ? Math.max(0, cap.v - parseC(a[1]).v) : null; // vạn còn góp được hôm nay
+        return cap && left != null ? { cap: cap.v, left, used: Math.max(0, cap.v - left), can: can ? can.lo : Infinity, txt: t } : null;
       };
-      const st = info();
-      if (!st) return "không đọc được số vạn lượng đã góp hôm nay";
       const own = Math.max(1, Math.floor(+m.max || BGOP_MAX_VAN));
-      const amt = Math.min(own - st.used, st.cap - st.used, st.can);
-      if (amt <= 0) {
-        return "không góp thêm: hôm nay đã góp " + st.used + "/" + Math.min(own, st.cap) + " vạn" + (st.can <= 0 ? " (không còn ngân lượng để góp)" : "");
+      const first = info();
+      if (!first) return "không đọc được số vạn lượng đã góp hôm nay (chữ trên thẻ: " + ((q("#bhMgr") ? q("#bhMgr").textContent : "").replace(/\s+/g, " ").slice(0, 120) || "trống") + ")";
+      let total = 0, st = first, note = "";
+      for (let pass = 0; pass < 4; pass++) {
+        const sv = readSave(true);
+        const gold = sv ? Math.floor(sv.gold / 1e4) : Infinity; // vạn lượng đang có
+        const amt = Math.min(st.left, own - st.used, st.can, gold);
+        if (amt <= 0) break;
+        const inp = q("#bhGopV"), go = q("#bhGopVb");
+        if (!inp || !go || go.disabled) { note = "nút Góp đang khóa"; break; }
+        inp.value = String(amt);
+        inp.dispatchEvent(new Event("input", { bubbles: true }));
+        inp.dispatchEvent(new Event("change", { bubbles: true }));
+        go.click();
+        if (!(await askYes())) { note = "game không hỏi xác nhận" + (toastOn() ? " (" + toastOn() + ")" : ""); break; }
+        const after = await waitFor(() => {
+          const s2 = info();
+          if (s2 && s2.left < st.left) return s2;
+          return TOAST_ERR.test(toastOn()) ? { err: toastOn() } : null;
+        }, 15000);
+        if (!after) { note = "game không phản hồi"; break; }
+        if (after.err) { note = after.err; break; }
+        total += st.left - after.left;
+        st = after;
+        if (amt >= gold) break; // đã góp hết ngân lượng đang có (bản lưu của game cũ tới ~10 giây nên không góp thêm lượt nữa)
       }
-      const inp = q("#bhGopV"), go = q("#bhGopVb");
-      if (!inp || !go || go.disabled) return "không góp được: nút Góp đang khóa (hôm nay " + st.used + "/" + st.cap + " vạn)";
-      inp.value = String(amt);
-      inp.dispatchEvent(new Event("input", { bubbles: true }));
-      inp.dispatchEvent(new Event("change", { bubbles: true }));
-      go.click();
-      if (!(await askYes())) return "không góp được: game không hỏi xác nhận" + (toastOn() ? " (" + toastOn() + ")" : "");
-      const after = await waitFor(() => {
-        const s2 = info();
-        return s2 && s2.used > st.used ? s2 : TOAST_ERR.test(toastOn()) ? { err: toastOn() } : null;
-      }, 15000);
-      if (!after) return "không góp được: game không phản hồi (đã gửi lệnh góp " + amt + " vạn, hôm nay " + st.used + "/" + st.cap + " vạn)";
-      if (after.err) return "không góp được: " + after.err;
-      return "đã góp " + (after.used - st.used) + " vạn lượng vào quỹ bang (+" + (after.used - st.used) + " cống hiến) · hôm nay " + after.used + "/" + Math.min(own, after.cap) + " vạn";
+      const cap = Math.min(own, st.cap);
+      if (!total) {
+        return "không góp thêm: " + (note || (st.left <= 0 || own - st.used <= 0 ? "hôm nay đã góp đủ (" + st.used + "/" + cap + " vạn)" : "không còn ngân lượng để góp (có thể góp " + (st.can === Infinity ? 0 : st.can) + " vạn)"));
+      }
+      return "đã góp " + total + " vạn lượng vào quỹ bang (+" + total + " cống hiến) · hôm nay " + st.used + "/" + cap + " vạn" + (note ? " · dừng: " + note : "");
     } finally {
       petUi = false;
       closeModalBtn();
