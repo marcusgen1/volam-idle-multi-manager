@@ -953,7 +953,7 @@
   allBox.appendChild(bgopBtn);
   const bshopBtn = document.createElement("button");
   bshopBtn.textContent = "🛒 Mua LB Dã Tẩu + PD (bang)";
-  bshopBtn.title = "Tất cả nhân vật: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên ở Cửa hàng bang hội bằng điểm cống hiến (mỗi món tối đa 10 / ngày)";
+  bshopBtn.title = "Tất cả nhân vật: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên ở Cửa hàng bang hội bằng điểm cống hiến (mỗi món tối đa 10 / ngày), rồi mở Hộp thư nhận hết thư";
   bshopBtn.onclick = () => {
     const idxs = activeSlots();
     if (idxs.length && confirm("Mua Lệnh Bài Dã Tẩu + Bình Phúc Duyên ở Cửa hàng bang của " + idxs.length + " khung đang bật?\n\nDùng điểm cống hiến, mỗi món tối đa 10 / ngày. Không hoàn tác.")) {
@@ -1357,7 +1357,7 @@
     { f: "sell", k: "sell", n: "Bán đồ xanh + HK cơ bản", t: "Bán đồ xanh rồi bán HK cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) để có chỗ trống trong hành trang. Giữ món khóa 🔒, đồ đang mặc, món cường hóa. Không hoàn tác" },
     { f: "dd", k: "dd", n: "Nhận quà điểm danh ngày", t: "Phần thưởng › Điểm danh: nhận quà hôm nay (và các mốc 5 / 10 / 15… ngày chưa nhận). Mỗi ngày nhận một lần" },
     { f: "bgop", k: "bgop", n: "Góp ngân lượng cho bang", t: "Góp ngân lượng (không dùng KNB) vào quỹ bang hội để lấy điểm cống hiến, tối đa số vạn lượng mỗi ngày ghi ở ô bên cạnh. Không hoàn tác" },
-    { f: "bshop", k: "bshop", n: "Mua LB Dã Tẩu + PD ở cửa hàng bang", t: "Cửa hàng bang hội: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên (mỗi món tối đa 10 / ngày) bằng điểm cống hiến. Không hoàn tác" },
+    { f: "bshop", k: "bshop", n: "Mua LB Dã Tẩu + PD ở cửa hàng bang", t: "Cửa hàng bang hội: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên (mỗi món tối đa 10 / ngày) bằng điểm cống hiến, rồi tự mở Hộp thư nhận hết thư (Lệnh Bài Dã Tẩu nằm trong thư). Không hoàn tác" },
     { f: "dg", k: "dg", n: "Phó Bản" },
     { f: "buy", k: "ldt", n: "Mua lệnh bài Dã Tẩu (Kỳ Trân Các)", t: "Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác" },
     { f: "dong", k: "dong", n: "Đóng bình PD", t: "Đóng bình Phúc Duyên (như nút Đóng bình PD)" },
