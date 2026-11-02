@@ -154,7 +154,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   - Chế độ lưu của khung được đặt về chế độ cuối (Leo Tháp / Luyện Công) ngay khi bắt đầu, nên khung tải lại giữa chừng sẽ về thẳng chế độ cuối chứ không chạy lại từ đầu.
 
 - **Lưu tài khoản và tự đăng nhập lại** (nút **🔑** ở mỗi khung, chỉ trong ứng dụng desktop): nhập tên tài khoản + mật khẩu cho khung đó. Khi khung bị đưa về màn đăng nhập
-  (hết phiên, bị đăng xuất, tải lại) mà không ai đang gõ phím trong vài giây, ứng dụng tự điền vào form đăng nhập của game và bấm **Đăng nhập**. **▶ Đăng nhập ngay** để đăng nhập ngay,
+  (hết phiên, bị đăng xuất, tải lại) mà không ai đang gõ phím trong vài giây, ứng dụng tự điền vào form đăng nhập của game và bấm **Đăng nhập** (nếu game đang ở màn menu thì tự bấm **Bắt Đầu Trò Chơi** trước để hiện form). **▶ Đăng nhập ngay** để đăng nhập ngay,
   ô **Tự đăng nhập lại** bật / tắt từng khung, **🗑 Xóa đã lưu** để xóa. Nút 🔑 sáng khi khung đã lưu tài khoản.
   - Mật khẩu lưu ở `credentials.json` trong thư mục dữ liệu của ứng dụng (quyền 0600), **mã hóa bằng kho khóa của hệ điều hành** (libsecret / kwallet trên Linux, Keychain, DPAPI). Máy không có kho khóa thì
     chỉ được che (base64) và hộp thoại cảnh báo. Mật khẩu **không bao giờ gửi sang trang quản lý**: trang chỉ nhận tên tài khoản và các cờ; chỉ tiến trình chính điền vào form và chỉ khi khung đang ở trang game.

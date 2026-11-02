@@ -2276,7 +2276,7 @@
     if (Date.now() - heroAt >= HERO_RETRY_MS) peekHeroName();
   };
 
-  // Màn đăng nhập (#ngU / #ngP / #ngIn): thấy liên tục LOGIN_WAIT_MS mà không ai gõ phím thì báo cho ứng dụng (nếu khung này có lưu tài khoản
+  // Màn đăng nhập (#ngU / #ngP / #ngIn, hoặc màn menu #ngStart của game mới): thấy liên tục LOGIN_WAIT_MS mà không ai gõ phím thì báo cho ứng dụng (nếu khung này có lưu tài khoản
   // và bật tự đăng nhập thì ứng dụng điền form). Chỉ chạy trong ứng dụng desktop. Bạn đang gõ (phím bấm trong vài giây qua) hoặc ô mật khẩu đã có chữ thì bỏ qua.
   const LOGIN_WAIT_MS = 4000;
   const LOGIN_RETRY_MS = 20000;
@@ -2287,8 +2287,9 @@
   const loginWatch = () => {
     if (!BR || !BR.loginScreen) return;
     const pw = q("#ngP");
-    if (!pw || !q("#ngIn")) { loginSeen = 0; return; }
-    if (pw.value || Date.now() - lastKeyAt < 8000) { loginSeen = 0; return; }
+    const menu = !pw && q("#ngStart"); // màn menu (Bắt Đầu Trò Chơi) trước khi hiện form đăng nhập
+    if (!menu && (!pw || !q("#ngIn"))) { loginSeen = 0; return; }
+    if ((pw && pw.value) || Date.now() - lastKeyAt < 8000) { loginSeen = 0; return; }
     const now = Date.now();
     if (!loginSeen) loginSeen = now;
     if (now - loginSeen >= LOGIN_WAIT_MS && now - loginSent >= LOGIN_RETRY_MS) {
