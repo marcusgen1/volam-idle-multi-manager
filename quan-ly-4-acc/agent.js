@@ -1403,13 +1403,74 @@
   // Mua Lệnh Bài Dã Tẩu (khóa "ldt") và Bình Phúc Duyên (khóa "fdl1") ở Cửa hàng bang (thẻ "🎁 Vật phẩm"), bằng điểm cống hiến / Phúc Duyên.
   // Mỗi món tối đa 10 / ngày: bấm nút [×N] (mua nhiều nhất có thể) rồi xác nhận, lặp tới khi đủ lượt hoặc nút bị khóa (không đủ điểm).
   const BSHOP_ITEMS = [["ldt", "Lệnh Bài Dã Tẩu"], ["fdl1", "Bình Phúc Duyên"]];
+  // Mua xong game gửi Lệnh Bài Dã Tẩu qua Hộp thư (không vào thẳng hành trang) nên mua xong phải mở thư nhận hết.
   async function pdBangShop() {
+    const r = await bangShopBuy();
+    if (!r.shopOpen) return r.msg;
+    const mail = await pdMail({ expect: r.ldt > 0 });
+    return r.msg + "; Thư: " + mail;
+  }
+  // Mở Hộp thư (nút #u20mail hoặc phím F6) và chờ danh sách thư hiện ra. Trả về "" nếu mở được, ngược lại là lý do.
+  async function openMailBox() {
+    const btn = q("#u20mail");
+    if (btn) btn.click();
+    else window.dispatchEvent(new KeyboardEvent("keydown", { key: "F6", bubbles: true }));
+    if (await waitFor(() => q(".ml-box .ml-h"), 10000)) return "";
+    closeModalBtn();
+    return toastText() || "không mở được Hộp thư (cần đăng nhập máy chủ)";
+  }
+  // Nhận hết thư: mở Hộp thư, bấm [Nhận tất cả], chờ game báo "Đã nhận N thư". Gặp lỗi (vd. hành trang đầy) game dừng ở thư đó;
+  // báo lỗi + số thư còn lại. m.expect = vừa mua đồ gửi qua thư: nếu chưa thấy thư nào thì chờ rồi mở lại 1 lần
+  // (game nhớ danh sách thư 30 giây, thư mới có thể chưa hiện).
+  async function pdMail(m) {
     if (!q("#mswMenu")) return "Chưa vào game";
     if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
     petUi = true;
     try {
+      const errs = [];
+      for (let pass = 0; pass < 2; pass++) {
+        const err = await openMailBox();
+        if (err) return err;
+        const all = q("#nmAll");
+        if (!all) {
+          closeModalBtn();
+          if (!(m && m.expect) || pass > 0) return "Hộp thư trống";
+          await wait(32000);
+          continue;
+        }
+        const total = +(q(".ml-box .ml-n") || {}).textContent || 0;
+        await waitFor(() => !toastOn(), 2500);
+        all.click();
+        let done = null;
+        await waitFor(() => {
+          const t = toastOn();
+          const mm = t.match(/Đã nhận (\d+) thư/);
+          if (mm) { done = +mm[1]; return true; }
+          if (t && !errs.includes(t)) errs.push(t);
+          return false;
+        }, 40000);
+        if (done == null) {
+          closeModalBtn();
+          return errs.length ? "không nhận được: " + errs.join(" / ") : "game không phản hồi, kiểm tra Hộp thư";
+        }
+        const left = qa(".ml-box [data-take]").length;
+        closeModalBtn();
+        return "đã nhận " + done + "/" + total + " thư" + (left ? " · còn " + left + " thư chưa nhận" + (errs.length ? " (" + errs.join(" / ") + ")" : "") : "");
+      }
+      return "Hộp thư trống";
+    } finally {
+      petUi = false;
+    }
+  }
+  // Phần mua ở cửa hàng bang. Trả về { msg, ldt: số Lệnh Bài đã mua, shopOpen: đã mở được cửa hàng }.
+  async function bangShopBuy() {
+    if (!q("#mswMenu")) return { msg: "Chưa vào game" };
+    if (modalOpen()) return { msg: "đang mở cửa sổ khác, thử lại sau" };
+    petUi = true;
+    let ldt = 0;
+    try {
       const o = await openBang("shop");
-      if (o.err) return o.err;
+      if (o.err) return { msg: o.err };
       if (!q('#bhMgr [data-bhmua="ldt"]') && q('#bhMgr [data-bhsc="vp"]')) {
         q('#bhMgr [data-bhsc="vp"]').click();
         await waitFor(() => q('#bhMgr [data-bhmua="ldt"]'), 5000);
@@ -1449,17 +1510,18 @@
           await waitFor(() => !toastOn(), 2500);
         }
         const st = status();
+        if (key === "ldt") ldt = bought;
         out.push(name + ": " + (bought ? "mua " + bought : "không mua") + (st ? " (hôm nay " + st.used + "/" + st.cap + ")" : "") + (stop && !/^đủ/.test(stop) ? " · dừng: " + stop : ""));
       }
-      return out.join("; ");
+      return { msg: out.join("; "), ldt, shopOpen: true };
     } finally {
       petUi = false;
       closeModalBtn();
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", dd: "Điểm danh ngày", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, dd: pdDiemDanh, bgop: pdBangGop, bshop: pdBangShop, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", dd: "Điểm danh ngày", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", mail: "Nhận hết thư", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, dd: pdDiemDanh, bgop: pdBangGop, bshop: pdBangShop, mail: pdMail, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
