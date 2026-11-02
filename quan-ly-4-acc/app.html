@@ -181,7 +181,7 @@
     ["dg", "🏯", "Phó Bản"],
     ["tower", "🗼", "Leo Tháp"],
   ];
-  const STEP_NAME = { sell: "Bán đồ", bgop: "Góp bang", bshop: "Mua ở cửa hàng bang", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao" }; // các bước hẹn giờ không phải chế độ
+  const STEP_NAME = { sell: "Bán đồ", dd: "Điểm danh", bgop: "Góp bang", bshop: "Mua ở cửa hàng bang", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao" }; // các bước hẹn giờ không phải chế độ
   const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, STEP_NAME[m] || m || "—"])[2];
 
   // Mỗi khung có một số cổng p cố định (cổng = BASE_PORT + p) nên phiên đăng nhập không bị lẫn khi thêm / xóa khung.
@@ -936,6 +936,11 @@
     }
   };
   allBox.appendChild(ldtBtn);
+  const ddBtn = document.createElement("button");
+  ddBtn.textContent = "📅 Nhận quà điểm danh";
+  ddBtn.title = "Tất cả nhân vật: nhận quà điểm danh hôm nay (Phần thưởng › Điểm danh), kèm các mốc 5 / 10 / 15… ngày chưa nhận";
+  ddBtn.onclick = () => forOn((i) => sendPd(i, "dd"));
+  allBox.appendChild(ddBtn);
   const bgopBtn = document.createElement("button");
   bgopBtn.textContent = "🏯 Góp bang (ngân lượng)";
   bgopBtn.title = "Tất cả nhân vật: góp ngân lượng (không dùng KNB) vào quỹ bang hội lấy điểm cống hiến, tối đa 15.000 vạn mỗi ngày (và không quá giới hạn của game)";
@@ -1350,6 +1355,7 @@
   // Các việc của một lịch: f = tên cờ bật/tắt trong lịch, k = khóa gửi cho agent. Thứ tự làm = thứ tự trong c.order (kéo lên / xuống trong hộp thoại để đổi, việc nằm trên làm trước)
   const SCHED_STEPS = [
     { f: "sell", k: "sell", n: "Bán đồ xanh + HK cơ bản", t: "Bán đồ xanh rồi bán HK cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) để có chỗ trống trong hành trang. Giữ món khóa 🔒, đồ đang mặc, món cường hóa. Không hoàn tác" },
+    { f: "dd", k: "dd", n: "Nhận quà điểm danh ngày", t: "Phần thưởng › Điểm danh: nhận quà hôm nay (và các mốc 5 / 10 / 15… ngày chưa nhận). Mỗi ngày nhận một lần" },
     { f: "bgop", k: "bgop", n: "Góp ngân lượng cho bang", t: "Góp ngân lượng (không dùng KNB) vào quỹ bang hội để lấy điểm cống hiến, tối đa số vạn lượng mỗi ngày ghi ở ô bên cạnh. Không hoàn tác" },
     { f: "bshop", k: "bshop", n: "Mua LB Dã Tẩu + PD ở cửa hàng bang", t: "Cửa hàng bang hội: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên (mỗi món tối đa 10 / ngày) bằng điểm cống hiến. Không hoàn tác" },
     { f: "dg", k: "dg", n: "Phó Bản" },
@@ -1360,11 +1366,16 @@
     { f: "hb", k: "hb", n: "Mở hồng bao", t: "Mở hồng bao" },
     { f: "quest", k: "quest", n: "Nhiệm Vụ" },
   ];
-  const schedDefault = () => ({ id: newSchedId(), name: "Lịch mới", on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], order: SCHED_STEPS.map((x) => x.f), sell: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, bgop: false, bshop: false, bgopMax: 15000, after: "tower", slots: null, last: {} });
+  const schedDefault = () => ({ id: newSchedId(), name: "Lịch mới", on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], order: SCHED_STEPS.map((x) => x.f), sell: true, dd: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, bgop: false, bshop: false, bgopMax: 15000, after: "tower", slots: null, last: {} });
   // Thứ tự đã lưu (bỏ khóa lạ / trùng) rồi nối thêm các việc còn thiếu (bản cũ chưa có việc mới) vào cuối
   const schedOrder = (c) => {
     const known = SCHED_STEPS.map((x) => x.f), o = (c.order || []).filter((f, i, a) => known.includes(f) && a.indexOf(f) === i);
-    return o.concat(known.filter((f) => !o.includes(f)));
+    known.forEach((f, i) => { // việc mới (bản cũ chưa có): chèn ngay sau việc đứng trước nó trong thứ tự mặc định
+      if (o.includes(f)) return;
+      const prev = known.slice(0, i).reverse().find((x) => o.includes(x));
+      o.splice(prev ? o.indexOf(prev) + 1 : 0, 0, f);
+    });
+    return o;
   };
   // Lịch mẫu thứ hai: chuỗi Phúc Duyên (đóng bình → dùng bình → mở hết rương → hồng bao → Nhiệm Vụ), có giờ riêng
   const schedPdDefault = () => Object.assign(schedDefault(), { name: "Phúc Duyên", times: ["06:00"], sell: false, dg: false, buy: false, dong: true, dung: true, mo: true, hb: true, quest: true });
@@ -1526,7 +1537,7 @@
       case "name": c.name = x.value.trim() || "Lịch"; break;
       case "time": if (/^\d{2}:\d{2}$/.test(x.value)) c.times[k] = x.value; break;
       case "day": c.days[k] = x.checked ? 1 : 0; break;
-      case "sell": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": case "bgop": case "bshop": c[x.dataset.s] = x.checked; break;
+      case "sell": case "dd": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": case "bgop": case "bshop": c[x.dataset.s] = x.checked; break;
       case "bgopMax": c.bgopMax = Math.max(1, Math.min(999999, Math.floor(+x.value) || 15000)); break;
       case "after": c.after = x.value === "tower" ? "tower" : "farm"; break;
       case "slot": {
