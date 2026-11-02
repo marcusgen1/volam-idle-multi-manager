@@ -56,6 +56,14 @@
   #scDlg label { display:flex; align-items:center; gap:4px; font-size:13px; cursor:pointer; }
   #scDlg .tabs button.on { border-color:var(--accent); color:var(--accent); font-weight:600; }
   #scDlg input[type=text] { background:var(--bg,#111); color:var(--text); border:1px solid var(--dim); border-radius:4px; padding:3px 6px; font-size:13px; }
+  #scDlg { max-height:92vh; overflow:auto; }
+  #scDlg .steps { display:flex; flex-direction:column; gap:3px; }
+  #scDlg .step { display:flex; align-items:center; gap:8px; padding:3px 6px; border:1px solid var(--line); border-radius:5px; background:rgba(255,255,255,.02); }
+  #scDlg .step.drag { border-color:var(--accent); background:rgba(216,176,74,.12); }
+  #scDlg .grip { cursor:grab; color:var(--dim); font-size:16px; line-height:1; padding:0 4px; user-select:none; touch-action:none; }
+  #scDlg .step label { flex:1; }
+  #scDlg .gm { font-size:12px; color:var(--dim); display:flex; align-items:center; gap:4px; }
+  #scDlg .gm input { width:70px; background:var(--bg); color:var(--text); border:1px solid var(--dim); border-radius:4px; padding:2px 4px; }
   #scDlg .times { display:flex; flex-direction:column; gap:4px; }
   #scDlg .time { display:flex; gap:6px; align-items:center; }
   #scDlg .info { margin-top:10px; font-size:12px; color:var(--dim); line-height:1.5; white-space:pre-line; }
@@ -173,7 +181,7 @@
     ["dg", "🏯", "Phó Bản"],
     ["tower", "🗼", "Leo Tháp"],
   ];
-  const STEP_NAME = { sell: "Bán đồ", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao" }; // các bước hẹn giờ không phải chế độ
+  const STEP_NAME = { sell: "Bán đồ", bgop: "Góp bang", bshop: "Mua ở cửa hàng bang", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao" }; // các bước hẹn giờ không phải chế độ
   const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, STEP_NAME[m] || m || "—"])[2];
 
   // Mỗi khung có một số cổng p cố định (cổng = BASE_PORT + p) nên phiên đăng nhập không bị lẫn khi thêm / xóa khung.
@@ -928,6 +936,26 @@
     }
   };
   allBox.appendChild(ldtBtn);
+  const bgopBtn = document.createElement("button");
+  bgopBtn.textContent = "🏯 Góp bang (ngân lượng)";
+  bgopBtn.title = "Tất cả nhân vật: góp ngân lượng (không dùng KNB) vào quỹ bang hội lấy điểm cống hiến, tối đa 15.000 vạn mỗi ngày (và không quá giới hạn của game)";
+  bgopBtn.onclick = () => {
+    const idxs = activeSlots();
+    if (idxs.length && confirm("Góp ngân lượng cho bang hội ở " + idxs.length + " khung đang bật?\n\nGóp tối đa 15.000 vạn lượng mỗi ngày mỗi nhân vật (không dùng KNB), nhận lại điểm cống hiến. Không hoàn tác.")) {
+      idxs.forEach((i) => post(i, { type: "pd", kind: "bgop", max: 15000 }));
+    }
+  };
+  allBox.appendChild(bgopBtn);
+  const bshopBtn = document.createElement("button");
+  bshopBtn.textContent = "🛒 Mua LB Dã Tẩu + PD (bang)";
+  bshopBtn.title = "Tất cả nhân vật: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên ở Cửa hàng bang hội bằng điểm cống hiến (mỗi món tối đa 10 / ngày)";
+  bshopBtn.onclick = () => {
+    const idxs = activeSlots();
+    if (idxs.length && confirm("Mua Lệnh Bài Dã Tẩu + Bình Phúc Duyên ở Cửa hàng bang của " + idxs.length + " khung đang bật?\n\nDùng điểm cống hiến, mỗi món tối đa 10 / ngày. Không hoàn tác.")) {
+      idxs.forEach((i) => sendPd(i, "bshop"));
+    }
+  };
+  allBox.appendChild(bshopBtn);
   // Đổi ngân lượng → KNB (giữ lại tối thiểu một số vạn lượng) và gửi hết KNB cho nhân vật khác bằng thư.
   // Hai việc này không hoàn tác được (game không cho đổi ngược KNB → lượng) nên nút "tất cả" hỏi lại trước khi chạy.
   const labelEl = (text) => { const e = document.createElement("span"); e.textContent = text; return e; };
@@ -1319,7 +1347,25 @@
   const SCHED_GRACE_MS = 10 * 60 * 1000;
   const DAY_NAMES = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
   const newSchedId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-  const schedDefault = () => ({ id: newSchedId(), name: "Lịch mới", on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], sell: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, after: "tower", slots: null, last: {} });
+  // Các việc của một lịch: f = tên cờ bật/tắt trong lịch, k = khóa gửi cho agent. Thứ tự làm = thứ tự trong c.order (kéo lên / xuống trong hộp thoại để đổi, việc nằm trên làm trước)
+  const SCHED_STEPS = [
+    { f: "sell", k: "sell", n: "Bán đồ xanh + HK cơ bản", t: "Bán đồ xanh rồi bán HK cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) để có chỗ trống trong hành trang. Giữ món khóa 🔒, đồ đang mặc, món cường hóa. Không hoàn tác" },
+    { f: "bgop", k: "bgop", n: "Góp ngân lượng cho bang", t: "Góp ngân lượng (không dùng KNB) vào quỹ bang hội để lấy điểm cống hiến, tối đa số vạn lượng mỗi ngày ghi ở ô bên cạnh. Không hoàn tác" },
+    { f: "bshop", k: "bshop", n: "Mua LB Dã Tẩu + PD ở cửa hàng bang", t: "Cửa hàng bang hội: mua Lệnh Bài Dã Tẩu và Bình Phúc Duyên (mỗi món tối đa 10 / ngày) bằng điểm cống hiến. Không hoàn tác" },
+    { f: "dg", k: "dg", n: "Phó Bản" },
+    { f: "buy", k: "ldt", n: "Mua lệnh bài Dã Tẩu (Kỳ Trân Các)", t: "Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác" },
+    { f: "dong", k: "dong", n: "Đóng bình PD", t: "Đóng bình Phúc Duyên (như nút Đóng bình PD)" },
+    { f: "dung", k: "dung", n: "Dùng bình PD", t: "Dùng hết bình Phúc Duyên Lộ trong hành trang" },
+    { f: "mo", k: "mo", n: "Mở hết rương PD", t: "Mở hết rương Phúc Duyên" },
+    { f: "hb", k: "hb", n: "Mở hồng bao", t: "Mở hồng bao" },
+    { f: "quest", k: "quest", n: "Nhiệm Vụ" },
+  ];
+  const schedDefault = () => ({ id: newSchedId(), name: "Lịch mới", on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], order: SCHED_STEPS.map((x) => x.f), sell: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, bgop: false, bshop: false, bgopMax: 15000, after: "tower", slots: null, last: {} });
+  // Thứ tự đã lưu (bỏ khóa lạ / trùng) rồi nối thêm các việc còn thiếu (bản cũ chưa có việc mới) vào cuối
+  const schedOrder = (c) => {
+    const known = SCHED_STEPS.map((x) => x.f), o = (c.order || []).filter((f, i, a) => known.includes(f) && a.indexOf(f) === i);
+    return o.concat(known.filter((f) => !o.includes(f)));
+  };
   // Lịch mẫu thứ hai: chuỗi Phúc Duyên (đóng bình → dùng bình → mở hết rương → hồng bao → Nhiệm Vụ), có giờ riêng
   const schedPdDefault = () => Object.assign(schedDefault(), { name: "Phúc Duyên", times: ["06:00"], sell: false, dg: false, buy: false, dong: true, dung: true, mo: true, hb: true, quest: true });
   if (!Array.isArray(state.scheds) || !state.scheds.length) {
@@ -1327,14 +1373,15 @@
     state.scheds = [Object.assign(schedDefault(), state.sched || {}, { name: "Phó Bản" }), schedPdDefault()];
     delete state.sched;
   }
-  state.scheds = state.scheds.map((c) => Object.assign(schedDefault(), c, { last: c.last || {} }));
+  state.scheds = state.scheds.map((c) => { const m = Object.assign(schedDefault(), c, { last: c.last || {} }); m.order = schedOrder(m); return m; });
   let scSel = 0; // lịch đang xem trong hộp thoại
   const sc = () => state.scheds[Math.min(scSel, state.scheds.length - 1)];
   const pad2 = (n) => String(n).padStart(2, "0");
   const dayKey = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
   const schedAt = (day, t) => { const [h, m] = String(t).split(":").map(Number); return new Date(day.getFullYear(), day.getMonth(), day.getDate(), h || 0, m || 0, 0); };
-  const schedSteps = (c) => [c.sell && "bán đồ xanh + HK cơ bản", c.dg && "Phó Bản", c.buy && "mua lệnh bài Dã Tẩu", c.dong && "đóng bình PD", c.dung && "dùng bình PD", c.mo && "mở hết rương PD", c.hb && "mở hồng bao", c.quest && "Nhiệm Vụ"].filter(Boolean).concat(c.after === "tower" ? "Leo Tháp" : "Luyện Công");
-  const schedStepKeys = (c) => [c.sell && "sell", c.dg && "dg", c.buy && "ldt", c.dong && "dong", c.dung && "dung", c.mo && "mo", c.hb && "hb", c.quest && "quest"].filter(Boolean);
+  const schedOn = (c) => schedOrder(c).filter((f) => c[f]).map((f) => SCHED_STEPS.find((x) => x.f === f));
+  const schedSteps = (c) => schedOn(c).map((x) => x.n).concat(c.after === "tower" ? "Leo Tháp" : "Luyện Công");
+  const schedStepKeys = (c) => schedOn(c).map((x) => x.k);
   function schedNext(c) {
     const now = new Date();
     let best = null;
@@ -1371,7 +1418,7 @@
       s.pet = false;
       save();
       refresh(i);
-      post(i, { type: "setMode", mode: "combo", restore: false, after: c.after === "tower" ? "tower" : "farm", kept: !!state.sellKept, steps: schedStepKeys(c) });
+      post(i, { type: "setMode", mode: "combo", restore: false, after: c.after === "tower" ? "tower" : "farm", kept: !!state.sellKept, bgopMax: c.bgopMax | 0, steps: schedStepKeys(c) });
       pending.delete(i);
       done.push(i);
     }
@@ -1439,15 +1486,9 @@
       c.times.map((t, k) => '<div class="time"><input type="time" data-s="time" data-k="' + k + '" value="' + t + '"><button class="sm" data-s="deltime" data-k="' + k + '" title="Bỏ giờ này">✕</button></div>').join("") +
       '</div><div class="row" style="margin-top:6px"><button class="sm" data-s="addtime"' + (c.times.length >= 6 ? " disabled" : "") + '>＋ Thêm giờ</button></div>' +
       '<h4>Các ngày trong tuần</h4><div class="row">' + order.map((k) => '<label><input type="checkbox" data-s="day" data-k="' + k + '"' + (c.days[k] ? " checked" : "") + '> ' + DAY_NAMES[k] + '</label>').join("") + '</div>' +
-      '<h4>Các việc, làm tuần tự</h4><div class="row">' +
-      '<label title="Trước khi chạy: bán đồ xanh rồi bán HK cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) để có chỗ trống trong hành trang. Giữ món khóa 🔒, đồ đang mặc, món cường hóa. Không hoàn tác"><input type="checkbox" data-s="sell"' + (c.sell ? " checked" : "") + '> Bán đồ xanh + HK cơ bản</label>' +
-      '<label><input type="checkbox" data-s="dg"' + (c.dg ? " checked" : "") + '> Phó Bản</label>' +
-      '<label title="Mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các, không hoàn tác"><input type="checkbox" data-s="buy"' + (c.buy ? " checked" : "") + '> Mua lệnh bài Dã Tẩu</label>' +
-      '<label title="Đóng bình Phúc Duyên (như nút Đóng bình PD)"><input type="checkbox" data-s="dong"' + (c.dong ? " checked" : "") + '> Đóng bình PD</label>' +
-      '<label title="Dùng hết bình Phúc Duyên Lộ trong hành trang"><input type="checkbox" data-s="dung"' + (c.dung ? " checked" : "") + '> Dùng bình PD</label>' +
-      '<label title="Mở hết rương Phúc Duyên"><input type="checkbox" data-s="mo"' + (c.mo ? " checked" : "") + '> Mở hết PD</label>' +
-      '<label title="Mở hồng bao"><input type="checkbox" data-s="hb"' + (c.hb ? " checked" : "") + '> Mở hồng bao</label>' +
-      '<label><input type="checkbox" data-s="quest"' + (c.quest ? " checked" : "") + '> Nhiệm Vụ</label></div>' +
+      '<h4>Các việc, làm lần lượt từ trên xuống (kéo ≡ để đổi thứ tự)</h4><div class="steps">' +
+      schedOrder(c).map((f) => { const x = SCHED_STEPS.find((y) => y.f === f); return '<div class="step" data-f="' + f + '"><span class="grip" title="Kéo lên / xuống để đổi thứ tự">≡</span><label' + (x.t ? ' title="' + esc2(x.t) + '"' : "") + '><input type="checkbox" data-s="' + f + '"' + (c[f] ? " checked" : "") + '> ' + x.n + '</label>' +
+        (f === "bgop" ? '<span class="gm" title="Số vạn lượng góp tối đa mỗi ngày"><input type="number" data-s="bgopMax" min="1" max="999999" value="' + (c.bgopMax | 0) + '"> vạn/ngày</span>' : "") + '</div>'; }).join("") + '</div>' +
       '<div class="row" style="margin-top:6px"><span style="font-size:13px">Xong thì về:</span><select data-s="after"><option value="tower"' + (c.after === "tower" ? " selected" : "") + '>Leo Tháp</option><option value="farm"' + (c.after !== "tower" ? " selected" : "") + '>Luyện Công</option></select></div>' +
       '<h4>Áp dụng cho các khung</h4><div class="row">' +
       state.slots.map((s, i) => '<label><input type="checkbox" data-s="slot" data-p="' + s.p + '"' + (!c.slots || c.slots.includes(s.p) ? " checked" : "") + '> Khung ' + (i + 1) + '</label>').join("") + '</div>' +
@@ -1485,7 +1526,8 @@
       case "name": c.name = x.value.trim() || "Lịch"; break;
       case "time": if (/^\d{2}:\d{2}$/.test(x.value)) c.times[k] = x.value; break;
       case "day": c.days[k] = x.checked ? 1 : 0; break;
-      case "sell": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": c[x.dataset.s] = x.checked; break;
+      case "sell": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": case "bgop": case "bshop": c[x.dataset.s] = x.checked; break;
+      case "bgopMax": c.bgopMax = Math.max(1, Math.min(999999, Math.floor(+x.value) || 15000)); break;
       case "after": c.after = x.value === "tower" ? "tower" : "farm"; break;
       case "slot": {
         const all = state.slots.map((s) => s.p), cur = new Set(c.slots || all);
@@ -1498,6 +1540,38 @@
     renderSched();
     if (x.dataset.s === "on" || x.dataset.s === "name") scRender(); else scInfo();
   };
+  // Kéo thả đổi thứ tự việc: bấm giữ ≡ rồi kéo lên / xuống (chuột hoặc cảm ứng); thả ra thì lưu thứ tự theo vị trí các dòng
+  let scDrag = null;
+  scDlg.addEventListener("pointerdown", (e) => {
+    const g = e.target.closest(".grip");
+    if (!g) return;
+    const row = g.closest(".step");
+    scDrag = { row, id: e.pointerId };
+    row.classList.add("drag");
+    try { g.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  scDlg.addEventListener("pointermove", (e) => {
+    if (!scDrag) return;
+    const over = document.elementFromPoint(e.clientX, e.clientY);
+    const t = over && over.closest && over.closest(".step");
+    if (!t || t === scDrag.row || t.parentNode !== scDrag.row.parentNode) return;
+    const r = t.getBoundingClientRect(), after = e.clientY > r.top + r.height / 2;
+    const down = t.compareDocumentPosition(scDrag.row) & Node.DOCUMENT_POSITION_FOLLOWING; // dòng đang kéo nằm dưới dòng đích
+    if (down && !after) t.parentNode.insertBefore(scDrag.row, t);
+    else if (!down && after) t.parentNode.insertBefore(scDrag.row, t.nextSibling);
+  });
+  const scDragEnd = () => {
+    if (!scDrag) return;
+    scDrag.row.classList.remove("drag");
+    sc().order = schedOrder({ order: [...scDlg.querySelectorAll(".step")].map((r) => r.dataset.f) });
+    scDrag = null;
+    save();
+    renderSched();
+    scInfo();
+  };
+  scDlg.addEventListener("pointerup", scDragEnd);
+  scDlg.addEventListener("pointercancel", scDragEnd);
   scDlg.onclick = (e) => {
     const x = e.target.closest("[data-s]");
     if (e.target === scDlg || (x && x.dataset.s === "close")) return scDlg.close();
@@ -1515,7 +1589,7 @@
     }
     else if (x.dataset.s === "now") {
       if (!schedTargets(c).length) { logToast("Hẹn giờ", "Không có khung nào đang bật"); return; }
-      if (!confirm("Chạy ngay lịch \"" + c.name + "\": " + schedSteps(c).join(" → ") + " ở " + schedTargets(c).length + " khung đang bật?" + ((c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : "") + (c.sell ? "\n\nBán đồ xanh + HK cơ bản không hoàn tác." : "")))) return;
+      if (!confirm("Chạy ngay lịch \"" + c.name + "\": " + schedSteps(c).join(" → ") + " ở " + schedTargets(c).length + " khung đang bật?" + ((c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : "") + (c.sell ? "\n\nBán đồ xanh + HK cơ bản không hoàn tác." : "") + (c.bgop ? "\n\nGóp ngân lượng cho bang tối đa " + (c.bgopMax | 0) + " vạn, không hoàn tác." : "") + (c.bshop ? "\n\nMua ở cửa hàng bang dùng điểm cống hiến, không hoàn tác." : "")))) return;
       scDlg.close();
       schedStart(c, "manual " + Date.now(), "Chạy thử");
     }

@@ -30,8 +30,8 @@
   const TRACKER_ALWAYS_ON = true;
   // "Chạy tất cả": lần lượt các chế độ này, xong hết thì về Luyện Công
   const COMBO = ["dg", "quest"];
-  const STEPS = ["sell", "dg", "ldt", "dong", "dung", "mo", "hb", "quest"]; // thứ tự các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống)
-  const PD_STEPS = ["ldt", "dong", "dung", "mo", "hb"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
+  const STEPS = ["sell", "bgop", "bshop", "dg", "ldt", "dong", "dung", "mo", "hb", "quest"]; // các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống); thứ tự làm theo thứ tự trang quản lý gửi sang
+  const PD_STEPS = ["ldt", "bgop", "bshop", "dong", "dung", "mo", "hb"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
   // Dòng nhật ký game ghi khi tự dời về bãi luyện công vì hết việc
   const DONE_LOG = { quest: "Hết nhiệm vụ, luyện công", dg: "Hết lượt phó bản, luyện công" };
   const TOAST_DONE = { dg: "Hết lượt phó bản" };
@@ -39,6 +39,7 @@
   let desired = null; // chế độ muốn giữ, null = không điều khiển
   let queue = []; // các việc còn lại của "Chạy tất cả" (sau việc đang làm)
   let comboAfter = "farm"; // chế độ sau khi "Chạy PB + NV" xong hết: "farm" (Luyện Công) hoặc "tower" (Leo Tháp)
+  let comboBgopMax = 0; // hẹn giờ: số vạn lượng góp bang tối đa mỗi ngày (0 = mặc định)
   let comboKept = false; // hẹn giờ: bước bán có gồm cả đồ xanh game đang giữ không
   let comboRun = 0; // số thứ tự lần chạy combo hiện tại; bạn chọn chế độ khác trong lúc đang mua thì lần mua đó không kéo khung đi tiếp nữa
   let note = ""; // lý do lần tự chuyển gần nhất (báo cho trang quản lý)
@@ -136,7 +137,7 @@
       for (let t = 0; t < 6 && run === comboRun; t++) {
         for (let w = 0; w < 30 && pdRun; w++) await wait(2000); // đang có lần chạy tay khác: chờ xong
         pdMsg = "";
-        await runPd(kind, {});
+        await runPd(kind, { max: comboBgopMax });
         if (!/đang mở cửa sổ khác|Chưa vào game|game không phản hồi/.test(pdMsg)) break; // khung chậm (proxy xa): mở lại cửa sổ thử lần nữa
         await wait(10000);
       }
@@ -1183,8 +1184,136 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
+  // --- Bang hội: mở cửa sổ Bang hội (nút #tabBang, chỉ hiện khi đã vào bang) rồi chuyển sang thẻ "gop" (💰 Cống hiến) hoặc "shop" (🛒 Cửa hàng) ---
+  async function openBang(tab) {
+    const btn = q("#tabBang");
+    if (!btn || btn.style.display === "none") return { err: "nhân vật chưa vào bang hội (không thấy nút Bang hội)" };
+    btn.click();
+    if (!(await waitFor(() => q("#bhMgr [data-bht]"), 10000))) {
+      closeModalBtn();
+      return { err: "không mở được cửa sổ Bang hội" };
+    }
+    const tabBtn = () => q('#bhMgr [data-bht="' + tab + '"]');
+    const ready = () => (tab === "gop" ? q("#bhGopV") : q("#bhMgr [data-bhsc]"));
+    if (!ready() && tabBtn()) tabBtn().click();
+    if (!(await waitFor(ready, 10000))) {
+      closeModalBtn();
+      return { err: "không mở được thẻ " + (tab === "gop" ? "Cống hiến" : "Cửa hàng") + " của bang" };
+    }
+    return {};
+  }
+  // Bấm nút xong game hỏi lại bằng hộp #askBox: bấm [Đồng ý]. Trả về false nếu không thấy hộp.
+  const askYes = async () => {
+    const yes = await waitFor(() => q('#askBox [data-a="1"]'), 3000);
+    if (!yes) return false;
+    yes.click();
+    return true;
+  };
+  // Góp ngân lượng vào quỹ bang (+1 cống hiến / 1 vạn lượng; KHÔNG dùng KNB): thẻ Cống hiến > ô số vạn lượng #bhGopV > [Góp].
+  // Mỗi ngày góp tối đa BGOP_MAX_VAN vạn (m.max đổi được), cũng không quá giới hạn của game ("Hôm nay X / Y vạn") và số lượng đang có
+  // ("có thể góp / đổi Z vạn"). Đọc ba số đó từ chữ trên thẻ rồi góp một lần, sau đó đọc lại để báo số đã góp.
+  const BGOP_MAX_VAN = 15000;
+  async function pdBangGop(m) {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    petUi = true;
+    try {
+      const o = await openBang("gop");
+      if (o.err) return o.err;
+      const info = () => {
+        let el = q("#bhGopV");
+        while (el && el.parentElement && !/Hôm nay/.test(el.textContent)) el = el.parentElement;
+        const t = el ? el.textContent.replace(/\s+/g, " ") : "";
+        const a = t.match(/Hôm nay\s*([\d.,]+)\s*\/\s*([\d.,]+)\s*vạn/);
+        const z = t.match(/có thể góp\s*\/\s*đổi\s*([\d.,]+)\s*vạn/);
+        return a ? { used: digits(a[1]), cap: digits(a[2]), can: z ? digits(z[1]) : Infinity, txt: t } : null;
+      };
+      const st = info();
+      if (!st) return "không đọc được số vạn lượng đã góp hôm nay";
+      const own = Math.max(1, Math.floor(+m.max || BGOP_MAX_VAN));
+      const amt = Math.min(own - st.used, st.cap - st.used, st.can);
+      if (amt <= 0) {
+        return "không góp thêm: hôm nay đã góp " + st.used + "/" + Math.min(own, st.cap) + " vạn" + (st.can <= 0 ? " (không còn ngân lượng để góp)" : "");
+      }
+      const inp = q("#bhGopV"), go = q("#bhGopVb");
+      if (!inp || !go || go.disabled) return "không góp được: nút Góp đang khóa (hôm nay " + st.used + "/" + st.cap + " vạn)";
+      inp.value = String(amt);
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      inp.dispatchEvent(new Event("change", { bubbles: true }));
+      go.click();
+      if (!(await askYes())) return "không góp được: game không hỏi xác nhận" + (toastOn() ? " (" + toastOn() + ")" : "");
+      const after = await waitFor(() => {
+        const s2 = info();
+        return s2 && s2.used > st.used ? s2 : TOAST_ERR.test(toastOn()) ? { err: toastOn() } : null;
+      }, 15000);
+      if (!after) return "không góp được: game không phản hồi (đã gửi lệnh góp " + amt + " vạn, hôm nay " + st.used + "/" + st.cap + " vạn)";
+      if (after.err) return "không góp được: " + after.err;
+      return "đã góp " + (after.used - st.used) + " vạn lượng vào quỹ bang (+" + (after.used - st.used) + " cống hiến) · hôm nay " + after.used + "/" + Math.min(own, after.cap) + " vạn";
+    } finally {
+      petUi = false;
+      closeModalBtn();
+    }
+  }
+  // Mua Lệnh Bài Dã Tẩu (khóa "ldt") và Bình Phúc Duyên (khóa "fdl1") ở Cửa hàng bang (thẻ "🎁 Vật phẩm"), bằng điểm cống hiến / Phúc Duyên.
+  // Mỗi món tối đa 10 / ngày: bấm nút [×N] (mua nhiều nhất có thể) rồi xác nhận, lặp tới khi đủ lượt hoặc nút bị khóa (không đủ điểm).
+  const BSHOP_ITEMS = [["ldt", "Lệnh Bài Dã Tẩu"], ["fdl1", "Bình Phúc Duyên"]];
+  async function pdBangShop() {
+    if (!q("#mswMenu")) return "Chưa vào game";
+    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
+    petUi = true;
+    try {
+      const o = await openBang("shop");
+      if (o.err) return o.err;
+      if (!q('#bhMgr [data-bhmua="ldt"]') && q('#bhMgr [data-bhsc="vp"]')) {
+        q('#bhMgr [data-bhsc="vp"]').click();
+        await waitFor(() => q('#bhMgr [data-bhmua="ldt"]'), 5000);
+      }
+      const out = [];
+      for (const [key, name] of BSHOP_ITEMS) {
+        const btns = () => qa('#bhMgr [data-bhmua="' + key + '"]');
+        const status = () => {
+          const b = btns()[0];
+          const c = b && b.closest(".u2card, .shoprow");
+          const t = c ? c.textContent.replace(/\s+/g, " ") : "";
+          const m = t.match(/(?:Hôm nay|Tuần này)\s*(\d+)\s*\/\s*(\d+)/);
+          return m ? { used: +m[1], cap: +m[2], txt: t } : null;
+        };
+        if (!btns().length) { out.push(name + ": không thấy trong cửa hàng"); continue; }
+        let bought = 0, stop = "";
+        for (let guard = 0; guard < 12 && !stop; guard++) {
+          const st = status();
+          if (st && st.used >= st.cap) { stop = "đủ " + st.cap + "/" + st.cap; break; }
+          const list = btns().filter((b) => !b.disabled);
+          const btn = list.sort((a, b) => (+b.dataset.sl || 1) - (+a.dataset.sl || 1))[0];
+          if (!btn) { stop = /🔒|Cần bang cấp/.test(st ? st.txt : "") ? "bang chưa đủ cấp" : "không đủ điểm" + (st ? " (hôm nay " + st.used + "/" + st.cap + ")" : ""); break; }
+          const before = st ? st.used : -1;
+          await waitFor(() => !toastOn(), 2500);
+          btn.click();
+          if (!(await askYes())) { stop = "game không hỏi xác nhận"; break; }
+          let toast = "";
+          const after = await waitFor(() => {
+            toast = toastOn() || toast;
+            const s2 = status();
+            if (s2 && s2.used > before) return s2;
+            return TOAST_ERR.test(toast) ? { err: toast } : null;
+          }, 20000);
+          if (!after) { stop = toast || "game không phản hồi"; break; }
+          if (after.err) { stop = after.err; break; }
+          bought += after.used - before;
+          await waitFor(() => !toastOn(), 2500);
+        }
+        const st = status();
+        out.push(name + ": " + (bought ? "mua " + bought : "không mua") + (st ? " (hôm nay " + st.used + "/" + st.cap + ")" : "") + (stop && !/^đủ/.test(stop) ? " · dừng: " + stop : ""));
+      }
+      return out.join("; ");
+    } finally {
+      petUi = false;
+      closeModalBtn();
+    }
+  }
+
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, bgop: pdBangGop, bshop: pdBangShop, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
@@ -1726,9 +1855,10 @@
     comboRun++;
     comboAfter = m.mode === "combo" && m.after === "tower" ? "tower" : "farm";
     if (m.mode === "combo") {
-      // steps (hẹn giờ): danh sách việc theo thứ tự Phó Bản → mua lệnh bài ("ldt") → Nhiệm Vụ, bỏ trống thì mặc định Phó Bản rồi Nhiệm Vụ
+      // steps (hẹn giờ): danh sách việc, làm lần lượt theo đúng thứ tự gửi sang; bỏ trống thì mặc định Phó Bản rồi Nhiệm Vụ
       comboKept = !!m.kept;
-      const steps = Array.isArray(m.steps) ? STEPS.filter((x) => m.steps.includes(x)) : COMBO;
+      comboBgopMax = +m.bgopMax || 0;
+      const steps = Array.isArray(m.steps) ? m.steps.filter((x, k) => STEPS.includes(x) && m.steps.indexOf(x) === k) : COMBO; // đúng thứ tự gửi sang, bỏ khóa lạ và khóa trùng
       queue = steps.slice(1);
       if (steps[0] === "sell" || PD_STEPS.includes(steps[0])) {
         explicit = false;
