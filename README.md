@@ -133,6 +133,10 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Mua lệnh bài Dã Tẩu** (🎫, mục Tất cả, hỏi xác nhận): mua hết Lệnh Bài Dã Tẩu có thể mua bằng **KNB khóa** ở Kỳ Trân Các (bảng "🔒 Bảng KNB khóa" › thẻ "Ủy thác & nhiệm vụ";
   giá và số lượng tối đa mỗi ngày theo Kỳ Trân Các của game, script đọc từ card chứ không ghi cứng). Bấm ×10 rồi Mua cho tới khi đủ số lượng trong ngày hoặc hết KNB khóa;
   báo số đã mua, KNB khóa đã dùng (= số lượng × giá trên card) và "hôm nay X/Y".
+- **Chế độ Nhiệm Vụ dùng hết Lệnh Bài**: mỗi lần vào Nhiệm Vụ, script bật bốn ô của game ở Hệ thống › Trợ Thủ Kiếm Hiệp › Chiến đấu › mục "Nhiệm vụ" (nhân vật mới mặc định tắt): *Dã Tẩu tự trả / nhận*, *Tự dùng Lệnh Bài Dã Tẩu*, *Tự gọi Sát Thủ khi có lệnh bài*, *Tự đi Boss Hoàng Kim*.
+  Game lưu các ô theo nhân vật nên bật một lần là đủ. Bật *Tự đi Boss Hoàng Kim* để khi Lệnh Bài Sát Thủ gọi ra Boss Hoàng Kim (5%) thì game hạ boss xong mới gọi Sát Thủ kế tiếp.
+  Khung Theo Dấu trống chưa coi là hết: nếu bản lưu của game còn Lệnh Bài Sát Thủ, Lệnh Bài Dã Tẩu còn dùng được hôm nay, Sát Thủ đang chờ hoặc Boss Hoàng Kim chưa hạ thì khung ở lại Nhiệm Vụ.
+  Các số đó đứng yên 90 giây (Boss Hoàng Kim: 15 phút) thì bỏ cuộc để khỏi kẹt mãi (ví dụ thiếu cấp 20, hoặc game không dùng được lệnh bài). Sát Thủ rất mạnh, nhân vật yếu có thể gục ngã nhiều lần.
 - **Nhận quà điểm danh** (📅, mục Tất cả): mở 🎁 Phần thưởng › Điểm danh và bấm "Nhận quà hôm nay" (kèm "Nhận bù mốc đã qua" nếu có mốc 5 / 10 / 15… ngày chưa nhận). Hôm nay nhận rồi thì báo "đã nhận rồi". Việc này cũng có trong hẹn giờ (mặc định bật).
 - **Góp bang (ngân lượng)** (🏯, mục Tất cả, hỏi xác nhận): mở cửa sổ Bang hội › thẻ "💰 Cống hiến" và góp ngân lượng (**không dùng KNB**; 1 vạn lượng = 1 điểm cống hiến) tối đa 15.000 vạn mỗi ngày,
   cũng không quá giới hạn trong ngày của game và số ngân lượng đang có. Nhân vật chưa vào bang thì báo "chưa vào bang hội". Không hoàn tác.

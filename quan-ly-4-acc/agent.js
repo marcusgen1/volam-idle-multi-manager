@@ -91,6 +91,8 @@
     towerDeaths = 0;
     workSeen = false;
     idleSince = 0;
+    questTokSig = "";
+    questTokSince = 0;
     logBase = countLog(DONE_LOG[desired]);
     sig = panelSig();
     sigSince = Date.now();
@@ -99,6 +101,30 @@
   const toastHas = (marker) => {
     const el = q("#toast");
     return !!el && el.classList.contains("on") && el.textContent.indexOf(marker) >= 0;
+  };
+  // Chế độ Nhiệm Vụ: khung Theo Dấu trống chưa có nghĩa là hết, còn Lệnh Bài Sát Thủ, Lệnh Bài Dã Tẩu (hôm nay còn dùng thêm được), Sát Thủ đang chờ hoặc Boss Hoàng Kim
+  // do Lệnh Bài gọi ra chưa hạ thì game vẫn đang / sắp làm tiếp (Boss Hoàng Kim hạ xong game mới gọi Sát Thủ kế). Số liệu đọc từ bản lưu của game (cũ tới ~10 giây).
+  // Không có tiến triển (các số này đứng yên) quá QUEST_WAIT_MS (Boss Hoàng Kim: QUEST_BOSS_WAIT_MS) thì bỏ cuộc, tránh kẹt mãi khi game không dùng được (thiếu cấp, ô tự dùng bị tắt…).
+  const QUEST_WAIT_MS = 90000;
+  const QUEST_BOSS_WAIT_MS = 15 * 60000;
+  let questTokSig = "";
+  let questTokSince = 0;
+  const questMore = (now) => {
+    const sv = readSave(true);
+    if (!sv || sv.lvl < 20) return false;
+    const pending = (sv.lb > 0 ? 1 : 0) + (sv.ldt > 0 && sv.ldtRoom ? 2 : 0) + (sv.st ? 4 : 0) + (sv.gbl ? 8 : 0);
+    if (!pending) return false;
+    const sig2 = [sv.lb, sv.ldt, sv.st ? 1 : 0, sv.gbl ? 1 : 0].join(",");
+    if (sig2 !== questTokSig || !questTokSince) {
+      questTokSig = sig2;
+      questTokSince = now;
+    }
+    if (now - questTokSince > (sv.gbl ? QUEST_BOSS_WAIT_MS : QUEST_WAIT_MS)) {
+      note = "Còn lệnh bài / Boss Hoàng Kim nhưng không có tiến triển: dừng chờ (" + [sv.lb ? sv.lb + " Lệnh Bài Sát Thủ" : "", sv.ldt && sv.ldtRoom ? sv.ldt + " Lệnh Bài Dã Tẩu" : "", sv.gbl ? "Boss Hoàng Kim chưa hạ" : ""].filter(Boolean).join(", ") + ")";
+      return false;
+    }
+    note = "Nhiệm Vụ: đang chờ game dùng hết " + [sv.lb ? sv.lb + " Lệnh Bài Sát Thủ" : "", sv.ldt && sv.ldtRoom ? sv.ldt + " Lệnh Bài Dã Tẩu" : "", sv.st ? "Sát Thủ đang chờ" : "", sv.gbl ? "Boss Hoàng Kim chưa hạ" : ""].filter(Boolean).join(", ");
+    return true;
   };
   const finishWork = (why) => {
     const label = desired === "quest" ? "nhiệm vụ" : "lượt phó bản";
@@ -173,8 +199,58 @@
     const b = q('#mswMenu [data-msw="' + m + '"]');
     if (!b) return false;
     b.click();
+    if (m === "quest") questPrep().catch(() => {});
     return true;
   };
+  // Chế độ Nhiệm Vụ của game chỉ tự dùng hết Lệnh Bài Dã Tẩu và tự gọi Sát Thủ (Lệnh Bài Sát Thủ) khi các ô trong thẻ "Thêm" › "Chiến đấu" › mục "Nhiệm vụ"
+  // đang bật (nhân vật mới mặc định tắt). Mỗi lần vào chế độ Nhiệm Vụ bật ba ô: Dã Tẩu tự trả / nhận (#tDt), Tự dùng Lệnh Bài Dã Tẩu (#tLdt), Tự gọi Sát Thủ khi có lệnh bài (#tSt).
+  // Game lưu các ô này theo nhân vật nên chỉ cần bật một lần; tối đa mỗi phút kiểm tra một lần.
+  // Chế độ Nhiệm Vụ của game chỉ tự dùng Lệnh Bài Dã Tẩu, tự gọi Sát Thủ (Lệnh Bài Sát Thủ) và tự đi hạ Boss Hoàng Kim khi các ô tương ứng đang bật (nhân vật mới mặc định tắt).
+  // Chúng nằm ở thẻ "Hệ thống" › nút "Trợ Thủ Kiếm Hiệp" › "⚔ Chiến đấu" › mục "Nhiệm vụ": Dã Tẩu tự trả / nhận (#tDt), Tự dùng Lệnh Bài Dã Tẩu (#tLdt),
+  // Tự gọi Sát Thủ khi có lệnh bài (#tSt), Tự đi Boss Hoàng Kim (#tGb). Bật #tGb để Boss Hoàng Kim do Lệnh Bài Sát Thủ gọi ra được hạ xong thì game mới gọi Sát Thủ tiếp
+  // (game bỏ qua lượt gọi khi còn Boss Hoàng Kim đang chờ và ô này bật). Game lưu các ô theo nhân vật nên chỉ cần bật một lần; mỗi lần vào Nhiệm Vụ kiểm tra lại (tối đa mỗi phút).
+  let questPrepAt = 0;
+  async function questPrep() {
+    if (petUi || bossRun || Date.now() - questPrepAt < 60000) return;
+    if (modalOpen()) return;
+    const moreTab = q('#tabs button[data-t="more"]');
+    if (!moreTab) return;
+    questPrepAt = Date.now();
+    petUi = true;
+    const prev = activeTab();
+    const on = [];
+    try {
+      if (prev !== "more") moreTab.click();
+      if (!q("#tLdt")) {
+        const tt = await waitFor(() => q("#smTt"), 3000);
+        if (!tt) return;
+        tt.click();
+        const fight = await waitFor(() => q('#t-more [data-tt="fight"]'), 3000);
+        if (!fight) return;
+        if (!fight.classList.contains("on")) fight.click();
+      }
+      if (!(await waitFor(() => q("#tLdt"), 3000))) return;
+      for (const [id, name] of [["tDt", "Dã Tẩu tự trả / nhận"], ["tLdt", "Tự dùng Lệnh Bài Dã Tẩu"], ["tSt", "Tự gọi Sát Thủ"], ["tGb", "Tự đi Boss Hoàng Kim"]]) {
+        const el = q("#" + id);
+        if (el && !el.checked) {
+          el.checked = true;
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          on.push(name);
+          await wait(200);
+        }
+      }
+      const back = qa("#t-more button").find((x) => /‹\s*Menu/.test(x.textContent) && x.offsetParent);
+      if (back) back.click(); // về menu Hệ thống như lúc đầu
+    } finally {
+      restoreTab(prev);
+      petUi = false;
+      if (on.length) {
+        note = "Đã bật cho Nhiệm Vụ: " + on.join(", ");
+        console.log("[VL] " + note);
+        report(true, true);
+      }
+    }
+  }
   const post = (o) => {
     try {
       if (BR) BR.post(Object.assign({ vl: 1 }, o));
@@ -2014,7 +2090,14 @@
       const num = (v) => (isFinite(+v) ? Math.round(+v) : 0);
       saveInfo =
         st && st.fac != null && num(st.lvl) > 0
-          ? { name: String(st.name || "").trim(), lvl: num(st.lvl), gold: num(st.gold), knb: num(st.knb), tw: num(st.rw && st.rw.twF) }
+          ? {
+              name: String(st.name || "").trim(), lvl: num(st.lvl), gold: num(st.gold), knb: num(st.knb), tw: num(st.rw && st.rw.twF),
+              // còn việc cho chế độ Nhiệm Vụ: Lệnh Bài Sát Thủ / Dã Tẩu, Sát Thủ đang chờ, Boss Hoàng Kim do lệnh bài gọi ra chưa hạ
+              lb: num(st.mats && st.mats.misc && st.mats.misc.lb), ldt: num(st.mats && st.mats.misc && st.mats.misc.ldt),
+              ldtRoom: !(st.dt && st.dt.du && st.dt.du === st.dt.day) && num(st.dt && st.dt.extra) < 160, // game còn cho dùng thêm lệnh bài Dã Tẩu hôm nay (tối đa 160 lệnh bài, và máy chủ chưa ghi đủ)
+              st: !!(st.st && (st.st.cur || st.st.cho)),
+              gbl: !!(st.gbl && !st.gbl.done && num(st.gbl.end) > Date.now() - 60000),
+            }
           : null;
     } catch (e) {
       saveInfo = null;
@@ -2211,8 +2294,12 @@
         if (!idleSince) idleSince = now;
         const limit = workSeen ? IDLE_MS : TRACKER_ALWAYS_ON ? NEVER_MS : Infinity;
         if (now - idleSince >= limit) {
-          done = true;
-          why = workSeen ? "khung Theo Dấu hết việc" : "khung Theo Dấu không có việc";
+          if (desired === "quest" && questMore(now)) {
+            // Khung Theo Dấu trống nhưng còn Lệnh Bài / Boss Hoàng Kim đang chờ: ở lại Nhiệm Vụ cho game tự dùng hết
+          } else {
+            done = true;
+            why = workSeen ? "khung Theo Dấu hết việc" : "khung Theo Dấu không có việc";
+          }
         }
       }
       const c = countLog(DONE_LOG[desired]);
