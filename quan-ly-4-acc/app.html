@@ -977,17 +977,13 @@
   const activeSlots = () => state.slots.map((s, i) => (s.on ? i : -1)).filter((i) => i >= 0);
   // Đổi lượng → KNB, Gửi hết KNB, Gửi đồ Hoàng Kim: bỏ qua khung 5 (khung chạy ở cổng 8805, thường là nhân vật nhận / giữ đồ)
   const moneySlots = () => activeSlots().filter((i) => state.slots[i].p !== PX_PORT);
-  if (state.keepVan == null) state.keepVan = 500;
-  allBox.appendChild(labelEl("Giữ lại (vạn lượng):"));
-  allBox.appendChild(inputEl("number", state.keepVan, "500", (v) => { state.keepVan = Math.max(0, Math.floor(+v || 0)); save(); }));
   const doiBtn = document.createElement("button");
   doiBtn.textContent = "💱 Đổi lượng → KNB";
-  doiBtn.title = "Tất cả nhân vật (trừ khung 5): đổi hết ngân lượng thành Kim Nguyên Bảo ở Kỳ Trân Các (1 KNB = 10 vạn lượng, có giới hạn mỗi ngày), giữ lại tối thiểu số vạn lượng ở ô trên";
+  doiBtn.title = "Tất cả nhân vật (trừ khung 5): đổi hết ngân lượng thành Kim Nguyên Bảo ở Kỳ Trân Các (1 KNB = 10 vạn lượng) cho tới khi hết ngân lượng hoặc chạm giới hạn đổi trong ngày thì dừng";
   doiBtn.onclick = () => {
     const idxs = moneySlots();
-    const keep = Math.max(0, Math.floor(+state.keepVan || 0));
-    if (idxs.length && confirm("Đổi ngân lượng thành KNB ở " + idxs.length + " khung đang bật (trừ khung 5), giữ lại tối thiểu " + keep.toLocaleString("vi-VN") + " vạn lượng?\n\nKNB không đổi ngược lại thành lượng được. Không hoàn tác.")) {
-      idxs.forEach((i) => post(i, { type: "pd", kind: "doi", keep }));
+    if (idxs.length && confirm("Đổi HẾT ngân lượng thành KNB ở " + idxs.length + " khung đang bật (trừ khung 5)? Tự dừng khi hết ngân lượng hoặc chạm giới hạn đổi trong ngày.\n\nKNB không đổi ngược lại thành lượng được. Không hoàn tác.")) {
+      idxs.forEach((i) => post(i, { type: "pd", kind: "doi" }));
     }
   };
   allBox.appendChild(doiBtn);
@@ -1030,7 +1026,7 @@
       ["sell", "Bán đồ", false, range(sellBtn, keptLbl)],
       ["pd", "Phúc Duyên", false, range(dongBtn, nguaBtn)],
       ["day", "Hằng ngày & bang", false, range(ldtBtn, bshopBtn)],
-      ["knb", "KNB & thư", false, kids.slice(at(doiBtn) - 2, at(guiHkBtn) + 1)],
+      ["knb", "KNB & thư", false, kids.slice(at(doiBtn), at(guiHkBtn) + 1)],
     ];
     let open = {};
     try { open = JSON.parse(localStorage.getItem("vl.sideOpen") || "{}") || {}; } catch (e) {}

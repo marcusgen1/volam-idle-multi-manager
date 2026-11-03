@@ -125,7 +125,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Chọn chế độ khác (Nhiệm Vụ, Phó Bản…) thì Bắt thú của khung đó tắt. Chọn bãi làm game tắt "Tự đổi theo cấp". Khung tải lại thì tự bật lại nếu đang bật.
 - **Đổi lượng → KNB** (💱) và **Gửi hết KNB** (📨), chỉ có ở mục Tất cả (đều hỏi xác nhận, không hoàn tác):
   - **Ba nút Đổi lượng → KNB, Gửi hết KNB và Gửi đồ Hoàng Kim bỏ qua khung 5** (khung chạy ở cổng 8805, thường là nhân vật nhận / giữ đồ); hộp xác nận ghi rõ "(trừ khung 5)".
-  - Đổi: mở Kỳ Trân Các và bấm mua KNB (1 KNB = 10 vạn lượng, giới hạn mỗi ngày — hiện 5.000) cho tới khi ngân lượng chỉ còn **số vạn lượng ở ô "Giữ lại"** (mặc định 500).
+  - Đổi: mở Kỳ Trân Các và bấm mua KNB (1 KNB = 10 vạn lượng, giới hạn mỗi ngày — hiện 5.000) cho tới khi **đổi hết ngân lượng** hoặc chạm giới hạn đổi trong ngày thì dừng (không còn ô "Giữ lại").
     Số ngân lượng lấy từ bản lưu của game (cũ tới ~10 giây nên chỉ đổi ít hơn chứ không đổi quá). Game không cho đổi ngược KNB → lượng. Kỳ Trân Các có hai bảng, script tự chuyển sang "💰 Bảng Kim Nguyên Bảo". KNB khóa không gửi thư được nên không tính vào "Gửi hết KNB".
   - Gửi: mở Hộp thư, gửi **toàn bộ KNB** đang có cho nhân vật ở ô "Gửi KNB cho nhân vật" (không kèm đồ, không phải thư giao dịch). Chỉ dùng được với tài khoản online.
 - **Mở rương ngựa** (🐎, mục Tất cả): mở hết Rương Ngựa đang có. Trước hết mở rương trong "túi vật phẩm" của Hành trang bằng nút **Dùng ×N** của game
