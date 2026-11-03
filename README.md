@@ -3,6 +3,7 @@
 **Võ Lâm Manager** là ứng dụng desktop (Electron): một cửa sổ có thanh điều khiển bên trái và **tối đa 5 khung game** cạnh nhau. Mỗi khung chạy **trang game chính thức**
 trong **một phiên riêng** (như một hồ sơ trình duyệt riêng): localStorage, cookie và phiên đăng nhập không dùng chung nên các tài khoản không đè lên nhau.
 Kèm các nút tự động hóa (đổi chế độ, Boss tuần, bán đồ xanh, bán HK cơ bản, đóng bình / dùng hết bình / mở hết rương Phúc Duyên, màn hình đen…) và proxy riêng cho từng khung.
+Menu bên trái gom các nút "Tất cả" thành nhóm **Chạy / Bán đồ / Phúc Duyên / Hằng ngày & bang / KNB & thư**: bấm tên nhóm để thu / mở (chỉ nhóm Chạy mở sẵn, trình duyệt nhớ lựa chọn của bạn).
 
 > Repo riêng tư. Không chứa mã của game: ứng dụng mở thẳng `https://volamidle.pages.dev`.
 
