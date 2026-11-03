@@ -648,14 +648,14 @@
     return { err: "không thấy mục cần tìm trong Kỳ Trân Các" + (seen ? " (đang hiện: " + seen + ")" : " (cửa sổ không mở)") };
   }
   const KNB_GOLD = 1e5; // ngân lượng cho 1 KNB
-  async function pdDoi(m) {
+  // Đổi HẾT ngân lượng sang KNB; dừng khi hết ngân lượng hoặc nút mua bị khóa (chạm giới hạn đổi trong ngày)
+  async function pdDoi() {
     if (!q("#mswMenu")) return "Chưa vào game";
     if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
-    const keep = Math.max(0, Math.floor(+m.keep || 0)) * 1e4; // nhập theo vạn lượng
     const sv = readSave(true);
     if (!sv) return "chưa đọc được số ngân lượng (nhân vật chưa nạp?)";
-    let remain = Math.floor((sv.gold - keep) / KNB_GOLD);
-    if (remain <= 0) return "không có gì để đổi (đang có " + fmtGold(sv.gold) + " lượng, giữ lại " + fmtGold(keep) + ")";
+    let remain = Math.floor(sv.gold / KNB_GOLD);
+    if (remain <= 0) return "không có gì để đổi (đang có " + fmtGold(sv.gold) + " lượng, chưa đủ 1 KNB)";
     petUi = true;
     try {
       const found = await openKtc(() => q('#mBody [data-ktc="knb"]'), /Đổi KNB/);
