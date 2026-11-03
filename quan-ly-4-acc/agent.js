@@ -15,6 +15,8 @@
   const MODES = ["farm", "dg", "quest", "tower", "combo"];
   const POLL_MS = 500;
   const REENTER_MS = 2000; // thấy Luyện Công (do gục trong tháp) bao lâu thì vào lại Leo Tháp
+  const STUCK_RETRY_MS = 4000; // đang kẹt ở Nhiệm Vụ / Phó Bản mà cần sang Leo Tháp: bấm lại sau bấy lâu
+  const STUCK_MAX_TRIES = 10;
   const MAX_TRIES = 3; // vào lại thất bại liên tiếp quá số lần này thì dừng
   const TOWER_MAX_DEATHS = 3; // chết liên tiếp ở Leo Tháp bấy nhiêu lần thì dừng vào lại và ở lại Luyện Công
   const TOWER_OK_MS = 180000; // ở trong tháp liên tục bấy lâu thì lần chết sau đó tính lại từ đầu (không còn "liên tiếp")
@@ -170,7 +172,9 @@
       if (run !== comboRun) return; // bạn đã chọn chế độ khác
       note = "Xong: " + PD_NAME[kind];
       advance();
-    })().catch(() => {});
+    })().catch(() => {
+      if (run === comboRun) advance(); // lỗi bất ngờ giữa chừng: vẫn làm tiếp việc kế, không đứng im
+    });
   };
   // Lần chạy hẹn giờ: về Luyện Công, bán đồ xanh rồi bán HK cơ bản để có chỗ trống trong hành trang (cửa sổ game bận thì thử lại vài lần), xong làm tiếp việc kế
   const sellStep = () => {
@@ -189,7 +193,9 @@
       if (run !== comboRun) return; // bạn đã chọn chế độ khác
       note = "Đã bán đồ trước khi chạy";
       advance();
-    })().catch(() => {});
+    })().catch(() => {
+      if (run === comboRun) advance();
+    });
   };
   const curMode = () => {
     const on = q("#mswMenu [data-msw].on");
@@ -2518,12 +2524,14 @@
         if (towerDeaths && now - towerSince >= TOWER_OK_MS) towerDeaths = 0; // trụ được đủ lâu: không còn tính là chết liên tiếp
         tries = 0;
         farmSince = 0;
-      } else if (mode === "farm") {
+      } else if (mode) {
+        // mode khác "farm" (Nhiệm Vụ / Phó Bản): game giữ nhãn cũ khi bấm sang Leo Tháp lần đầu không ăn (đang đánh Sát Thủ / Boss, hộp thoại…) → thử lại, đừng đứng im
+        const stuck = mode !== "farm";
         const now = Date.now();
         if (!farmSince) {
           farmSince = now;
           // Vừa từ tháp về Luyện Công (do gục ngã): tính một lần chết
-          if (towerSince) {
+          if (towerSince && !stuck) {
             towerDeaths++;
             towerSince = 0;
             console.log("[VL] Gục ngã ở Leo Tháp (lần chết liên tiếp thứ " + towerDeaths + "/" + TOWER_MAX_DEATHS + ")");
@@ -2539,14 +2547,16 @@
           report(true, true);
           return;
         }
-        if (now - farmSince >= REENTER_MS) {
+        if (now - farmSince >= (stuck ? STUCK_RETRY_MS : REENTER_MS)) {
           farmSince = 0;
-          if (tries >= MAX_TRIES) {
+          if (tries >= (stuck ? STUCK_MAX_TRIES : MAX_TRIES)) {
             desired = null;
+            note = "Không vào được Leo Tháp (đang ở " + mode + "): thiếu cấp / bị chặn?";
             console.log("[VL] Không vào lại được Leo Tháp (thiếu cấp / bị chặn?), dừng tự vào lại");
             report(true, true);
           } else {
             tries++;
+            if (stuck && tries % 3 === 0) clickMode("farm"); // bấm qua Luyện Công rồi vào Tháp để game bỏ nhãn cũ
             clickMode("tower");
             console.log("[VL] Rời tháp -> vào lại Leo Tháp (lần " + tries + ")");
           }
