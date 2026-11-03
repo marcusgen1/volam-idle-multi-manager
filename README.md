@@ -113,8 +113,8 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
 - **Bán đồ xanh** (💰; thủ công + **Tự bán** khi hành trang đầy, Tự bán chỉ bán đồ xanh), tùy chọn gồm cả đồ xanh game đang giữ.
 - **Bán HK cơ bản** (🛡, chỉ thủ công, không nằm trong Tự bán): bán lẻ đồ **Hoàng Kim cơ bản** — món có tên bắt đầu bằng Định Quốc, Hiệp Cốt, Kim Phong hoặc
-  Thiên Hoàng — lấy **KNB khóa** (game đổi mỗi món Hoàng Kim 10 KNB khóa). Giữ lại: món khóa 🔒 / đang giữ cho Dã Tẩu, món đã cường hóa (+N), đồ đang mặc,
-  đồ Hoàng Kim bộ khác (An Bang, Môn Phái…), Bạch Kim và đồ xanh.
+  Thiên Hoàng — lấy **KNB khóa** (game đổi mỗi món Hoàng Kim 10 KNB khóa). Món HK cơ bản đang khóa 🔒 được **tự mở khóa trước khi bán** (nút 🛡 ở menu trái và nút 🛡 từng khung; bán theo lịch và Tự bán vẫn giữ món khóa).
+  Giữ lại: món đang giữ cho Dã Tẩu 📜, món đã cường hóa (+N), đồ đang mặc, đồ Hoàng Kim bộ khác (An Bang, Môn Phái…) dù khóa hay không, Bạch Kim và đồ xanh.
 - **Đóng bình PD** (🎐), **Dùng bình PD** (🧪: dùng hết bình Đại / Trung / Tiểu trong hành trang, cộng điểm Phúc Duyên)
   và **Mở hết PD** (🎁: mở hết rương Phúc Duyên trong Phần thưởng, mỗi rương 10 điểm). **Mở hồng bao** (🧧): mở hết Hồng Bao và Đại Hồng Bao đang có
   (lưu trên máy chủ, dùng chung cả tài khoản; mỗi lần bấm game mở tối đa 10 cái nên script bấm lặp tới khi hết). Nút "tất cả" ở đầu trang hỏi lại trước khi chạy.

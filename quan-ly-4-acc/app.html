@@ -245,7 +245,7 @@
   const sendPd = (i, kind) => post(i, { type: "pd", kind });
 
   const sendSell = (i) => post(i, { type: "sell", kept: !!state.sellKept });
-  const sendSellHk = (i) => post(i, { type: "sell", what: "hk" });
+  const sendSellHk = (i) => post(i, { type: "sell", what: "hk", unlock: true });
   const sendAutoSell = (i) => post(i, { type: "autoSell", on: !!state.autoSell, kept: !!state.sellKept });
   const sendBoss = (i) => post(i, { type: "boss" });
   const sendPet = (i, on) => post(i, { type: "pet", on: !!on });
@@ -447,7 +447,7 @@
       '<button class="sm" data-boss title="Boss tuần: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng)" aria-label="Boss tuần">👹</button>' +
       '<button class="sm" data-pet title="Bắt thú: bật / tắt đi tìm những loài thú chưa có trong Thú điển (đứng ở bãi có loài còn thiếu và luyện công)" aria-label="Bắt thú">🐾</button>' +
       '<button class="sm" data-sell title="Bán đồ xanh trong hành trang (đồ khóa, đồ đang mặc, đồ bạn đặt giữ được giữ lại)" aria-label="Bán đồ xanh">💰</button>' +
-      '<button class="sm" data-sellhk title="Bán HK cơ bản: bán đồ Hoàng Kim cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) lấy KNB khóa; giữ món khóa, món đã cường hóa và bộ khác" aria-label="Bán HK cơ bản">🛡</button>' +
+      '<button class="sm" data-sellhk title="Bán HK cơ bản: bán đồ Hoàng Kim cơ bản (Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) lấy KNB khóa; tự mở khóa món HK cơ bản đang khóa trước khi bán; giữ món đã cường hóa và bộ khác" aria-label="Bán HK cơ bản">🛡</button>' +
       '<button class="sm" data-pdd title="Đóng bình PD: đóng hết Phúc Duyên chờ đóng thành bình Đại / Trung / Tiểu" aria-label="Đóng bình">🎐</button>' +
       '<button class="sm" data-pdu title="Dùng bình PD: dùng hết bình Phúc Duyên Lộ Đại / Trung / Tiểu trong hành trang (cộng điểm Phúc Duyên)" aria-label="Dùng bình">🧪</button>' +
       '<button class="sm" data-pdh title="Mở hồng bao: mở hết Hồng Bao và Đại Hồng Bao đang có (lượng / Kim Nguyên Bảo ngẫu nhiên)" aria-label="Mở hồng bao">🧧</button>' +
@@ -863,7 +863,7 @@
   allBox.appendChild(sellBtn);
   const sellHkBtn = document.createElement("button");
   sellHkBtn.textContent = "🛡 Bán HK cơ bản";
-  sellHkBtn.title = "Tất cả nhân vật: bán đồ Hoàng Kim cơ bản (bộ Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) lấy KNB khóa. Giữ lại món khóa 🔒, món đã cường hóa, các bộ khác và đồ xanh. Không nằm trong Tự bán.";
+  sellHkBtn.title = "Tất cả nhân vật: bán đồ Hoàng Kim cơ bản (bộ Định Quốc, Hiệp Cốt, Kim Phong, Thiên Hoàng) lấy KNB khóa. Món HK cơ bản đang khóa 🔒 được tự mở khóa trước khi bán. Giữ lại món đã cường hóa, các bộ khác, ô 📜 giữ cho Dã Tẩu và đồ xanh. Không nằm trong Tự bán.";
   sellHkBtn.onclick = () => forOn(sendSellHk);
   allBox.appendChild(sellHkBtn);
   const autoBtn = document.createElement("button");
@@ -927,16 +927,6 @@
   nguaBtn.title = "Tất cả nhân vật: mở hết Rương Ngựa đang có (qua Kỳ Trân Các > Thú cưỡi > Dùng, mỗi lần mở 1 rương; ngựa vào hành trang, cần còn chỗ trống)";
   nguaBtn.onclick = () => forOn((i) => sendPd(i, "ngua"));
   allBox.appendChild(nguaBtn);
-  const unlockBtn = document.createElement("button");
-  unlockBtn.textContent = "🔓 Mở khóa đồ HK";
-  unlockBtn.title = "Tất cả nhân vật: mở khóa nhanh mọi món Hoàng Kim đang khóa 🔒 trong hành trang (game chỉ có nút mở khóa từng món). Ngựa, Bạch Kim, đồ tím… và ô 📜 giữ cho Dã Tẩu không đổi.";
-  unlockBtn.onclick = () => {
-    const idxs = activeSlots();
-    if (idxs.length && confirm("Mở khóa TẤT CẢ đồ Hoàng Kim đang khóa 🔒 trong hành trang của " + idxs.length + " khung đang bật?\n\nMón hết khóa sẽ không còn được bảo vệ khi Dọn kho / bán đồ (kể cả Bán Xanh + HK cơ bản và Tự bán). Ngựa, Bạch Kim và đồ khác giữ nguyên khóa.")) {
-      idxs.forEach((i) => sendPd(i, "unlock"));
-    }
-  };
-  allBox.appendChild(unlockBtn);
   const ldtBtn = document.createElement("button");
   ldtBtn.textContent = "🎫 Mua lệnh bài Dã Tẩu";
   ldtBtn.title = "Tất cả nhân vật: mua hết Lệnh Bài Dã Tẩu có thể mua bằng KNB khóa ở Kỳ Trân Các (giá và số lượng tối đa mỗi ngày theo Kỳ Trân Các của game)";
@@ -1038,7 +1028,7 @@
     const defs = [
       ["run", "Chạy", true, [comboBtn, comboSel, ...modeBtns, bossBtn, petBtn]],
       ["sell", "Bán đồ", false, range(sellBtn, keptLbl)],
-      ["pd", "Phúc Duyên", false, range(dongBtn, unlockBtn)],
+      ["pd", "Phúc Duyên", false, range(dongBtn, nguaBtn)],
       ["day", "Hằng ngày & bang", false, range(ldtBtn, bshopBtn)],
       ["knb", "KNB & thư", false, kids.slice(at(doiBtn) - 2, at(guiHkBtn) + 1)],
     ];

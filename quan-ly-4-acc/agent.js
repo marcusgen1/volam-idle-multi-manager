@@ -985,46 +985,6 @@
     }
   }
 
-  // Mở khóa nhanh đồ Hoàng Kim trong hành trang: game chỉ mở khóa từng món (chi tiết món > [Mở khóa]), không có nút mở khóa hàng loạt.
-  // Duyệt các ô Hoàng Kim (lớp r4) có biểu tượng 🔒 ở thẻ Hành trang, bấm ô, bấm [Mở khóa]. Đồ khác (ngựa, Bạch Kim, đồ tím…) giữ nguyên khóa;
-  // ô 📜 (giữ cho Dã Tẩu) không phải khóa nên bỏ qua; món không khóa được (không có nút Mở khóa) cũng bỏ qua.
-  const lockedTiles = () => qa("#t-inv .invgrid .it.r4").filter((el) => /🔒/.test((el.querySelector(".lk") || {}).textContent || ""));
-  async function pdMoKhoa() {
-    if (!q("#mswMenu")) return "Chưa vào game";
-    if (modalOpen()) return "đang mở cửa sổ khác, thử lại sau";
-    const invTab = q('#tabs button[data-t="inv"]');
-    if (!invTab) return "không thấy thẻ Hành trang";
-    const prev = activeTab();
-    if (prev !== "inv") invTab.click();
-    petUi = true;
-    try {
-      await wait(200);
-      const before = lockedTiles().length;
-      if (!before) return "không có món Hoàng Kim nào đang khóa trong hành trang";
-      let done = 0;
-      const tried = new Set();
-      for (let guard = 0; guard < 400; guard++) {
-        const tile = lockedTiles().find((el) => !tried.has(el.dataset.uid));
-        if (!tile) break;
-        tried.add(tile.dataset.uid);
-        tile.click();
-        const btn = await waitFor(() => q("#bLock"), 2000);
-        if (btn && /Mở khóa/.test(btn.textContent)) {
-          btn.click();
-          if (await waitFor(() => !tile.isConnected || !/🔒/.test((tile.querySelector(".lk") || {}).textContent || ""), 2500)) done++;
-        }
-        closeModalBtn();
-        await wait(60);
-      }
-      const left = lockedTiles().length;
-      return "đã mở khóa " + done + "/" + before + " món Hoàng Kim" + (left ? " · còn " + left + " món khóa (không mở khóa được)" : "");
-    } finally {
-      petUi = false;
-      closeModalBtn();
-      restoreTab(prev);
-    }
-  }
-
   // Lọc đồ Hoàng Kim "max / gần max" rồi cất vào Rương Chứa Đồ. Chi tiết món (bấm ô trong thẻ Hành trang) liệt kê từng dòng thuộc tính, dòng nào có
   // giá trị ngẫu nhiên thì kèm khoảng [min ~ max], ví dụ "Sinh lực tối đa: +112 điểm [80 ~ 120]". Mỗi dòng có khoảng được tính tỉ lệ
   // giá trị / max (+11% [8 ~ 12] = 92%); từ ngưỡng % trở lên là "gần max" (100% = đúng max). Khoảng có số âm thì tính theo vị trí
@@ -1520,8 +1480,8 @@
     }
   }
 
-  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", unlock: "Mở khóa đồ HK", ldt: "Mua lệnh bài Dã Tẩu", dd: "Điểm danh ngày", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", mail: "Nhận hết thư", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
-  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, unlock: pdMoKhoa, ldt: pdLdt, dd: pdDiemDanh, bgop: pdBangGop, bshop: pdBangShop, mail: pdMail, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
+  const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", ldt: "Mua lệnh bài Dã Tẩu", dd: "Điểm danh ngày", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", mail: "Nhận hết thư", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
+  const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, ldt: pdLdt, dd: pdDiemDanh, bgop: pdBangGop, bshop: pdBangShop, mail: pdMail, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
   async function runPd(kind, m) {
     if (pdRun) return;
     pdRun = true;
@@ -1894,6 +1854,29 @@
     }
     return sold;
   }
+  // Mở khóa các món HK cơ bản đang khóa 🔒 (chưa cường hóa) để bán được: game chỉ mở khóa từng món (chi tiết món > [Mở khóa]).
+  // Chỉ đụng món thuộc bộ cơ bản; bộ khác, món đã cường hóa, ngựa, Bạch Kim và ô 📜 (giữ cho Dã Tẩu) giữ nguyên khóa.
+  const lockedTiles = () => qa("#t-inv .invgrid .it.r4").filter((el) => /🔒/.test((el.querySelector(".lk") || {}).textContent || ""));
+  async function unlockHkBasicTiles() {
+    let done = 0;
+    const tried = new Set();
+    for (let guard = 0; guard < 150; guard++) {
+      const tile = lockedTiles().find((el) => !tried.has(el.dataset.uid));
+      if (!tile) break;
+      tried.add(tile.dataset.uid);
+      tile.click();
+      const name = await waitFor(() => q("#mBody .idet h4"), 2000);
+      const basic = name && HK_BASIC.test(name.firstChild ? name.firstChild.textContent : name.textContent) && !name.querySelector(".enh");
+      const btn = basic && q("#bLock");
+      if (btn && /Mở khóa/.test(btn.textContent)) {
+        btn.click();
+        if (await waitFor(() => !tile.isConnected || !/🔒/.test((tile.querySelector(".lk") || {}).textContent || ""), 2500)) done++;
+      }
+      closeAnyModal();
+      await wait(60);
+    }
+    return done;
+  }
   async function sellBlue(kept) {
     if (!q("#mswMenu")) return { sold: 0, msg: "Chưa vào game" };
     const modal = q("#modal");
@@ -1968,7 +1951,8 @@
     }
   }
   // Bán riêng đồ Hoàng Kim cơ bản (không đụng tới đồ xanh): chuyển sang thẻ Hành trang, bán lẻ từng món, trả lại thẻ cũ
-  async function sellHk() {
+  // unlock: mở khóa trước các món HK cơ bản đang khóa rồi mới bán (nút Bán HK cơ bản); bán theo lịch / Tự bán thì vẫn giữ món khóa
+  async function sellHk(unlock) {
     if (!q("#mswMenu")) return { sold: 0, msg: "Chưa vào game" };
     if (modalOpen()) return { sold: 0, msg: "đang mở cửa sổ khác, thử lại sau" };
     const invTab = q('#tabs button[data-t="inv"]');
@@ -1977,17 +1961,20 @@
     if (prev !== "inv") invTab.click();
     try {
       await wait(150);
+      const un = unlock ? await unlockHkBasicTiles() : 0;
+      if (un) await wait(150);
       const n = await sellHkBasicTiles();
+      const pre = un ? "đã mở khóa " + un + " món · " : "";
       return {
         sold: n,
-        msg: n > 0 ? "đã bán " + n + " món HK cơ bản (→ KNB khóa)" : "không có món HK cơ bản nào để bán (đồ khóa, đã cường hóa và bộ khác được giữ lại)",
+        msg: pre + (n > 0 ? "đã bán " + n + " món HK cơ bản (→ KNB khóa)" : "không có món HK cơ bản nào để bán (" + (unlock ? "" : "đồ khóa, ") + "đã cường hóa và bộ khác được giữ lại)"),
       };
     } finally {
       restoreTab(prev);
     }
   }
   // what: "blue" (Bán đồ xanh, cả Tự bán) hoặc "hk" (Bán HK cơ bản)
-  async function runSell(auto, kept, what) {
+  async function runSell(auto, kept, what, unlock) {
     if (sellRun) return { sold: 0 };
     sellRun = true;
     const label = auto ? "Tự bán" : what === "hk" ? "Bán HK cơ bản" : "Bán đồ xanh";
@@ -1995,7 +1982,7 @@
     report(true);
     let r = { sold: 0 };
     try {
-      r = what === "hk" ? await sellHk() : await sellBlue(!!kept);
+      r = what === "hk" ? await sellHk(unlock) : await sellBlue(!!kept);
       sellMsg = label + ": " + r.msg;
     } catch (err) {
       sellMsg = label + ": lỗi " + (err && err.message ? err.message : err);
@@ -2035,7 +2022,7 @@
       return;
     }
     if (m && m.vl === 1 && m.type === "sell") {
-      runSell(false, !!m.kept, m.what === "hk" ? "hk" : "blue");
+      runSell(false, !!m.kept, m.what === "hk" ? "hk" : "blue", !!m.unlock);
       return;
     }
     if (m && m.vl === 1 && m.type === "autoSell") {
