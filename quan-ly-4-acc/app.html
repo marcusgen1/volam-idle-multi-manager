@@ -20,6 +20,17 @@
   .grp { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
   .grp > span { color: var(--dim); font-size: 11px; margin-top: 2px; }
   .sep { height: 1px; background: var(--line); margin: 4px 0; flex: none; }
+  .grp.top { flex-direction: row; gap: 3px; }
+  .grp.top button { flex: 1 1 auto; width: auto; padding: 2px 4px; text-align: center; white-space: nowrap; }
+  /* Nhóm nút thu / mở được (menu trái) */
+  .sec { display: flex; flex-direction: column; gap: 3px; }
+  #side button.sh { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--dim); font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; padding: 3px 2px; }
+  #side button.sh:hover { color: var(--accent); }
+  #side button.sh .n { font-weight: 400; opacity: .7; margin-left: 4px; }
+  .sec > .sb { display: flex; flex-direction: column; gap: 3px; }
+  .sec.closed > .sb { display: none; }
+  #allModes > span:first-child { display: none; }
+
   .grow { flex: 1; }
   #content { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
   button { background:#1d2a25; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 9px; font:inherit; cursor:pointer; }
@@ -129,10 +140,10 @@
 <div id="shell">
 <aside id="side">
   <h1 id="title">Quản lý nhân vật</h1>
-  <div class="grp">
+  <div class="grp top">
     <button id="lGrid" title="Chia lưới, các khung đều nằm ngang (4 khung = 2×2; 5 khung = 3 trên + 2 dưới)">Lưới</button>
     <button id="lRow" title="Tất cả khung cạnh nhau trong một hàng">1 hàng</button>
-    <button id="addSlot" title="Thêm một khung game mới">＋ Thêm khung</button>
+    <button id="addSlot" title="Thêm một khung game mới">＋</button>
   </div>
   <span class="sep"></span>
   <div class="grp" id="allModes"><span>Tất cả:</span></div>
@@ -1017,6 +1028,46 @@
   };
   allBox.appendChild(guiHkBtn);
 
+
+  // ----- Gom các nút "Tất cả" thành nhóm thu / mở được cho menu trái gọn lại (trạng thái nhớ trong trình duyệt) -----
+  (() => {
+    const kids = [...allBox.children];
+    const at = (el) => kids.indexOf(el);
+    const range = (a, b) => kids.slice(at(a), at(b) + 1);
+    const modeBtns = kids.slice(at(comboSel) + 1, at(bossBtn));
+    const defs = [
+      ["run", "Chạy", true, [comboBtn, comboSel, ...modeBtns, bossBtn, petBtn]],
+      ["sell", "Bán đồ", false, range(sellBtn, keptLbl)],
+      ["pd", "Phúc Duyên", false, range(dongBtn, unlockBtn)],
+      ["day", "Hằng ngày & bang", false, range(ldtBtn, bshopBtn)],
+      ["knb", "KNB & thư", false, kids.slice(at(doiBtn) - 2, at(guiHkBtn) + 1)],
+    ];
+    let open = {};
+    try { open = JSON.parse(localStorage.getItem("vl.sideOpen") || "{}") || {}; } catch (e) {}
+    const saveOpen = () => { try { localStorage.setItem("vl.sideOpen", JSON.stringify(open)); } catch (e) {} };
+    defs.forEach(([id, name, dflt, els]) => {
+      const sec = document.createElement("div");
+      sec.className = "sec";
+      const head = document.createElement("button");
+      head.className = "sh";
+      const body = document.createElement("div");
+      body.className = "sb";
+      els.forEach((e) => body.appendChild(e));
+      const n = body.querySelectorAll("button:not(.sh)").length;
+      const paint = () => {
+        const o = open[id] != null ? open[id] : dflt;
+        sec.classList.toggle("closed", !o);
+        head.textContent = (o ? "▾ " : "▸ ") + name;
+        if (!o) { const c = document.createElement("span"); c.className = "n"; c.textContent = "(" + n + ")"; head.appendChild(c); }
+        head.title = (o ? "Thu gọn " : "Mở ") + name;
+      };
+      head.onclick = () => { open[id] = sec.classList.contains("closed"); saveOpen(); paint(); };
+      paint();
+      sec.appendChild(head);
+      sec.appendChild(body);
+      allBox.appendChild(sec);
+    });
+  })();
 
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");
