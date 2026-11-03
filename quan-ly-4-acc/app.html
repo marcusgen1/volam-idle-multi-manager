@@ -79,6 +79,22 @@
   #scDlg .time { display:flex; gap:6px; align-items:center; }
   #scDlg .info { margin-top:10px; font-size:12px; color:var(--dim); line-height:1.5; white-space:pre-line; }
   #scDlg .ft { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  #mkDlg { background:var(--panel); color:var(--text); border:1px solid var(--accent); border-radius:8px; padding:10px; width:min(660px,96vw); }
+  #mkDlg::backdrop { background:rgba(0,0,0,.6); }
+  #mkDlg .hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  #mkDlg .bar { display:flex; gap:6px; align-items:center; }
+  #mkDlg .bar input { flex:1; min-width:0; background:#0e1412; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 6px; font:inherit; }
+  #mkDlg .bar select { max-width:170px; background:#1d2a25; color:var(--text); border:1px solid var(--line); border-radius:4px; padding:3px 4px; font:inherit; }
+  #mkDlg .note { font-size:12px; margin:6px 0; min-height:1.4em; color:var(--dim); }
+  #mkDlg .note.err { color:#e0705a; }
+  #mkDlg .note.ok { color:var(--accent); }
+  #mkDlg .list { max-height:55vh; overflow-y:auto; border-top:1px solid var(--line); }
+  #mkDlg .r { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) 100px 56px; gap:8px; align-items:center; padding:3px 2px; border-bottom:1px solid var(--line); font-size:12px; }
+  #mkDlg .r.best { background:#16241e; }
+  #mkDlg .r .n, #mkDlg .r .s { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #mkDlg .r .s { color:var(--dim); }
+  #mkDlg .r .p { color:#e0b341; font-weight:600; text-align:right; white-space:nowrap; }
+  #mkDlg .r.done { opacity:.5; }
   #crDlg { background:var(--panel); color:var(--text); border:1px solid var(--accent); border-radius:8px; padding:10px; width:min(380px,94vw); }
   #crDlg::backdrop { background:rgba(0,0,0,.6); }
   #crDlg .hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
@@ -150,6 +166,7 @@
   <span class="grow"></span>
   <button id="updNow" title="Kiểm tra bản mới trên GitHub ngay (không cần chờ thông báo) và cập nhật nếu có">⬆ Cập nhật</button>
   <button id="logBtn" title="Nhật ký hoạt động của từng nhân vật: cấp tăng, ngân lượng kiếm được trong ngày, đồ đáng chú ý">📒 Nhật ký <small id="logBadge"></small></button>
+  <button id="mktBtn" title="Nhập tên món, xem giá bán trên Chợ (rẻ → đắt) và mua ngay">🏪 Chợ: tìm đồ</button>
   <button id="schedBtn" title="Hẹn giờ tự động chạy các lịch (Phó Bản, Phúc Duyên, …)">⏰ Hẹn giờ: TẮT</button>
   <button id="blackBtn" title="Bật / tắt màn hình đen cho tất cả khung: game ngừng vẽ nhưng vẫn chạy, nhẹ máy nhất khi treo. Bấm vào khung đen để bật lại khung đó.">🌑 Màn hình đen: TẮT</button>
   <button id="reloadAll" title="Tải lại tất cả khung game">⟳ Tải lại</button>
@@ -376,6 +393,8 @@
       if (d) { ensureGrid(d); send(i, d, true); }
       if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
       if (state.slots[i].pet) sendPet(i, true); // và Bắt thú nếu khung này đang bật
+    } else if (m.type === "mkt") {
+      mktMsg(i, m);
     } else if (m.type === "events") {
       logEvents(i, m.lines);
     } else if (m.type === "status") {
@@ -1054,6 +1073,106 @@
       allBox.appendChild(sec);
     });
   })();
+
+  // ----- Chợ: tìm món theo tên, xem giá (rẻ → đắt) và mua -----
+  // Nhờ một khung đang vào game (cần tài khoản online) mở Chợ của game, tìm và đọc giá; nút [Mua] mua đúng tin đó bằng nhân vật của khung đã chọn.
+  const mkDlg = document.createElement("dialog");
+  mkDlg.id = "mkDlg";
+  mkDlg.innerHTML =
+    '<div class="hd"><b>🏪 Tìm đồ trên Chợ</b><button class="sm" data-m="close" title="Đóng">✕</button></div>' +
+    '<div class="bar"><select id="mkSlot" title="Nhân vật dùng để tìm và mua"></select><input id="mkQ" type="text" maxlength="40" placeholder="Tên món (không cần dấu) → Enter" autocomplete="off"><button class="sm" data-m="go">🔍 Tìm</button></div>' +
+    '<div class="note" id="mkNote"></div><div class="list" id="mkList"></div>';
+  document.body.appendChild(mkDlg);
+  const mkq = (x) => mkDlg.querySelector(x);
+  const mkEsc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+  let mkReq = 0, mkBusy = false, mkTimer = 0, mkLast = { q: "", slot: -1, rows: [] };
+  const mkNote = (t, cls) => { const n = mkq("#mkNote"); n.textContent = t || ""; n.className = "note" + (cls ? " " + cls : ""); };
+  const mkSetBusy = (b, t) => {
+    mkBusy = b;
+    clearTimeout(mkTimer);
+    if (b) mkTimer = setTimeout(() => { mkBusy = false; mkNote("Khung không trả lời, thử lại.", "err"); mkRender(); }, 120000);
+    mkDlg.querySelectorAll("button[data-m=go], #mkList button").forEach((x) => { x.disabled = b || x.dataset.cant === "1"; });
+    if (t) mkNote(t);
+  };
+  function mkFillSlots() {
+    const sel = mkq("#mkSlot");
+    const want = state.mktSlot != null ? state.mktSlot : -1;
+    sel.innerHTML = "";
+    state.slots.forEach((s, i) => {
+      if (!s.on) return;
+      const o = document.createElement("option");
+      o.value = i;
+      const l = live[i] || {};
+      o.textContent = "Khung " + (i + 1) + (l.hero ? " · " + l.hero : "") + (l.ready ? "" : " (chưa vào game)");
+      sel.appendChild(o);
+    });
+    const ready = [...sel.options].find((o) => live[+o.value] && live[+o.value].ready);
+    sel.value = [...sel.options].some((o) => +o.value === want) ? want : ready ? ready.value : sel.options.length ? sel.options[0].value : "";
+  }
+  function mkRender() {
+    const list = mkq("#mkList");
+    if (!mkLast.rows.length) { list.innerHTML = ""; return; }
+    list.innerHTML = mkLast.rows.map((r, k) =>
+      '<div class="r' + (k === 0 ? " best" : "") + (r.done ? " done" : "") + '" data-id="' + r.id + '"><span class="n" title="' + mkEsc(r.name) + '">' + mkEsc(r.name) + '</span><span class="s" title="' + mkEsc(r.seller) + '">' + mkEsc(r.seller) + '</span><span class="p">' + mkEsc(r.price) + '</span>' +
+      (r.done ? '<span class="dim">đã mua</span>' : r.own ? '<span class="dim">của bạn</span>' : '<button class="sm" data-m="buy" data-id="' + r.id + '"' + (r.can ? "" : ' data-cant="1" disabled title="Không đủ tiền"') + '>Mua</button>') + '</div>').join("");
+  }
+  function mkSearch() {
+    if (mkBusy) return;
+    const qv = mkq("#mkQ").value.trim();
+    const slot = parseInt(mkq("#mkSlot").value, 10);
+    if (qv.length < 2) return mkNote("Nhập ít nhất 2 ký tự tên món.", "err");
+    if (!(slot >= 0)) return mkNote("Chưa có khung nào đang bật.", "err");
+    state.mktSlot = slot; state.mktQ = qv; save();
+    mkLast = { q: qv, slot, rows: [] };
+    mkRender();
+    mkSetBusy(true, "Đang mở Chợ và tìm “" + qv + "”… (lần đầu có thể mất vài giây)");
+    post(slot, { type: "mkt", act: "search", q: qv, req: ++mkReq });
+  }
+  function mkBuy(id) {
+    if (mkBusy) return;
+    const r = mkLast.rows.find((x) => x.id === id);
+    if (!r) return;
+    const l = live[mkLast.slot] || {};
+    if (!confirm("Mua “" + r.name + "” của " + r.seller + " giá " + r.price + "\nbằng nhân vật " + (l.hero || "khung " + (mkLast.slot + 1)) + "?\n\nTiền trừ ngay, món được gửi vào Thư (mở Hộp thư để nhận). Không hoàn tác.")) return;
+    mkSetBusy(true, "Đang mua “" + r.name + "”…");
+    post(mkLast.slot, { type: "mkt", act: "buy", q: mkLast.q, id, req: ++mkReq });
+  }
+  function mktMsg(i, m) {
+    if (m.req !== mkReq || i !== mkLast.slot || !mkBusy) return;
+    mkSetBusy(false);
+    if (m.act === "buy") {
+      const r = mkLast.rows.find((x) => x.id === m.id);
+      if (m.ok) {
+        if (r) r.done = true;
+        mkNote("✔ Đã mua" + (r ? " “" + r.name + "” giá " + r.price : "") + " — món nằm trong Thư, mở Hộp thư để nhận.", "ok");
+      } else {
+        if (r && /không còn/.test(m.err || "")) mkLast.rows = mkLast.rows.filter((x) => x.id !== m.id);
+        mkNote("Không mua được: " + (m.err || "lỗi không rõ"), "err");
+      }
+      mkRender();
+      return;
+    }
+    if (m.err) { mkLast.rows = []; mkRender(); return mkNote("Không tìm được: " + m.err, "err"); }
+    mkLast.rows = m.rows || [];
+    mkRender();
+    mkNote(mkLast.rows.length
+      ? "Tìm “" + mkLast.q + "”: " + (m.total || mkLast.rows.length + " tin") + (m.pages > 4 ? " — hiện " + mkLast.rows.length + " tin rẻ nhất" : "") + ". Xếp từ rẻ đến đắt."
+      : "Không có tin nào khớp “" + mkLast.q + "”.");
+  }
+  mkDlg.onclick = (e) => {
+    const x = e.target.closest("[data-m]");
+    if (e.target === mkDlg || (x && x.dataset.m === "close")) return mkDlg.close();
+    if (!x) return;
+    if (x.dataset.m === "go") mkSearch();
+    else if (x.dataset.m === "buy") mkBuy(+x.dataset.id);
+  };
+  mkq("#mkQ").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); mkSearch(); } };
+  document.getElementById("mktBtn").onclick = () => {
+    mkFillSlots();
+    if (!mkq("#mkQ").value && state.mktQ) mkq("#mkQ").value = state.mktQ;
+    mkDlg.showModal();
+    mkq("#mkQ").focus();
+  };
 
   // ----- Bố cục -----
   const lGrid = document.getElementById("lGrid");

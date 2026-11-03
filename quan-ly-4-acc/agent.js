@@ -1480,6 +1480,149 @@
     }
   }
 
+  // --- Chợ: tìm món theo tên, đọc giá (rẻ → đắt) và mua theo mã tin ---
+  // Dùng chính màn Chợ của game (🌐 Giang hồ online > Chợ > Mua): gõ tên vào ô tìm (game bỏ dấu, tìm theo tên món / người bán), xếp "Giá thấp → cao",
+  // đọc các dòng của vài trang đầu. Bộ lọc loại / phẩm chất / tiền / "hợp với tôi" / "đủ tiền" được tạm bỏ để thấy hết tin rồi trả lại như cũ.
+  // Mua: tìm lại cùng từ khóa, bấm [Mua] của đúng mã tin rồi xác nhận hộp của game. Món mua được game gửi vào Thư.
+  let mktRun = false;
+  const MKT_PAGES = 4; // 15 tin / trang
+  // Đổi một ô của màn Chợ rồi chờ game vẽ lại (ô cũ bị thay bằng ô mới)
+  async function mktSet(sel, v, isCheck) {
+    const el = q(sel);
+    if (!el) return false;
+    if (isCheck ? el.checked === !!v : el.value === String(v)) return true;
+    el.dataset.stale = "1";
+    if (isCheck) el.checked = !!v;
+    else el.value = String(v);
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    return !!(await waitFor(() => { const n = q(sel); return n && !n.dataset.stale; }, 8000));
+  }
+  async function mktOpen() {
+    const b = q("#u20mkt");
+    if (b && b.getClientRects().length) b.click(); // nút cạnh trái của giao diện rộng (ẩn khi chưa đăng nhập online)
+    else {
+      const nb = q("#netBtn");
+      if (!nb) return "không thấy nút Chợ (cần đăng nhập máy chủ)";
+      nb.click();
+      const t = await waitFor(() => q('#netTabs [data-nt="mkt"]'), 5000);
+      if (!t) return "không mở được Giang hồ online";
+      t.click();
+    }
+    if (!(await waitFor(() => q("#nkSub"), 15000))) { closeModalBtn(); return toastText() || "không mở được Chợ (cần đăng nhập máy chủ)"; }
+    const buy = q('#nkSub [data-nk="buy"]');
+    if (buy && !buy.classList.contains("on")) {
+      buy.click();
+      await waitFor(() => q("#nkQ"), 20000);
+    }
+    if (!(await waitFor(() => q("#nkQ"), 40000))) { closeModalBtn(); return "Chợ tải quá lâu"; }
+    return "";
+  }
+  const MKT_FILTERS = [["#nkSlot", "", false], ["#nkRar", "", false], ["#nkCur2", "", false], ["#nkFit", false, true], ["#nkCan", false, true], ["#nkSort", "lo", false]];
+  async function mktPrepare(query) {
+    const init = { q: (q("#nkQ") || {}).value || "", f: MKT_FILTERS.map(([sel, , chk]) => { const el = q(sel); return el ? (chk ? el.checked : el.value) : null; }) };
+    for (const [sel, v, chk] of MKT_FILTERS) await mktSet(sel, v, chk);
+    const box = q("#nkQ");
+    box.dataset.stale = "1";
+    box.value = query;
+    q("#nkTim").click();
+    if (!(await waitFor(() => { const n = q("#nkQ"); return n && !n.dataset.stale; }, 20000))) return { init, err: "Chợ không phản hồi" };
+    return { init };
+  }
+  async function mktRestore(init) {
+    if (!init || !q("#nkQ")) return;
+    for (let k = 0; k < MKT_FILTERS.length; k++) {
+      const v = init.f[k];
+      if (v != null) await mktSet(MKT_FILTERS[k][0], v, MKT_FILTERS[k][2]);
+    }
+    if (q("#nkQ").value !== init.q) {
+      const box = q("#nkQ");
+      box.dataset.stale = "1";
+      box.value = init.q;
+      (init.q ? q("#nkTim") : q("#nkQx") || q("#nkTim")).click();
+      await waitFor(() => { const n = q("#nkQ"); return n && !n.dataset.stale; }, 10000);
+    }
+  }
+  // Các dòng tin đang hiện ở trang hiện tại
+  function mktRows() {
+    return qa(".nmrow").filter((r) => r.querySelector("[data-li]")).map((r) => {
+      const info = r.children[1] || r;
+      const nameEl = info.firstElementChild;
+      const small = info.querySelector("small.dim");
+      const buy = r.querySelector("[data-buy]");
+      return {
+        id: +r.querySelector("[data-li]").dataset.li,
+        name: nameEl ? nameEl.textContent.trim() : "",
+        seller: small ? small.textContent.split("·")[0].trim() : "",
+        price: ((r.querySelector(".cp") || {}).textContent || "").trim(),
+        own: !buy,
+        can: !!buy && !buy.disabled,
+      };
+    });
+  }
+  const mktPages = () => { const pg = q("#nkPg"); return pg ? pg.options.length : 1; };
+  const mktTotal = () => { const t = qa(".mktf small.dim").map((e) => e.textContent).find((x) => /món/.test(x)); return t ? t.trim() : ""; };
+  async function mktSearch(query) {
+    const o = await mktPrepare(query);
+    try {
+      if (o.err) return { err: o.err };
+      const rows = [];
+      const pages = Math.min(MKT_PAGES, mktPages());
+      for (let p = 0; p < pages; p++) {
+        if (p > 0 && !(await mktSet("#nkPg", p))) break;
+        rows.push(...mktRows());
+      }
+      return { rows, total: mktTotal(), pages: mktPages() };
+    } finally {
+      await mktRestore(o.init);
+    }
+  }
+  async function mktBuy(query, id) {
+    const o = await mktPrepare(query);
+    try {
+      if (o.err) return { err: o.err };
+      let btn = null;
+      const pages = Math.min(MKT_PAGES + 2, mktPages());
+      for (let p = 0; p < pages && !btn; p++) {
+        if (p > 0 && !(await mktSet("#nkPg", p))) break;
+        btn = q('[data-buy="' + id + '"]');
+      }
+      if (!btn) return { err: "tin này không còn trên Chợ (đã bán hoặc hết hạn), tìm lại để lấy giá mới" };
+      if (btn.disabled) return { err: "không mua được: không đủ tiền hoặc món không hợp lệ" };
+      await waitFor(() => !toastOn(), 2500);
+      btn.click();
+      if (!(await askYes())) return { err: "game không hỏi xác nhận" };
+      let toast = "";
+      const res = await waitFor(() => {
+        toast = toastOn() || toast;
+        if (/Đã mua/.test(toast)) return "ok";
+        return TOAST_ERR.test(toast) || /không|lỗi|Chợ đang/i.test(toast) ? "err" : null;
+      }, 25000);
+      if (res === "ok") return { ok: true, msg: toast };
+      return { err: toast || "game không phản hồi, kiểm tra Thư / số dư trong game" };
+    } finally {
+      await mktRestore(o.init);
+    }
+  }
+  async function runMkt(m) {
+    const reply = (r) => post(Object.assign({ type: "mkt", act: m.act, id: m.id || 0, q: m.q || "", req: m.req || 0 }, r));
+    if (mktRun) return reply({ err: "đang xử lý lệnh Chợ trước, thử lại sau" });
+    if (!q("#mswMenu")) return reply({ err: "Chưa vào game" });
+    if (modalOpen()) return reply({ err: "đang mở cửa sổ khác, thử lại sau" });
+    mktRun = true;
+    petUi = true;
+    try {
+      const err = await mktOpen();
+      if (err) return reply({ err });
+      reply(m.act === "buy" ? await mktBuy(String(m.q || ""), +m.id) : await mktSearch(String(m.q || "")));
+    } catch (e) {
+      reply({ err: "lỗi: " + (e && e.message ? e.message : e) });
+    } finally {
+      petUi = false;
+      mktRun = false;
+      closeModalBtn();
+    }
+  }
+
   const PD_NAME = { dong: "Đóng bình Phúc Duyên", dung: "Dùng hết bình Phúc Duyên", mo: "Mở hết rương Phúc Duyên", hb: "Mở hồng bao", doi: "Đổi lượng → KNB", knb: "Gửi KNB", hk: "Gửi đồ Hoàng Kim", ngua: "Mở rương ngựa", ldt: "Mua lệnh bài Dã Tẩu", dd: "Điểm danh ngày", bgop: "Góp ngân lượng cho bang", bshop: "Mua LB Dã Tẩu + PD (cửa hàng bang)", mail: "Nhận hết thư", hkchk: "Kiểm tra HK max", hkcat: "Cất HK max", hkbest: "Cất món HK tốt nhất" };
   const PD_RUN = { dong: pdDong, dung: pdDung, mo: pdMo, hb: pdHb, doi: pdDoi, knb: pdGuiKnb, hk: pdGuiHk, ngua: pdRngua, ldt: pdLdt, dd: pdDiemDanh, bgop: pdBangGop, bshop: pdBangShop, mail: pdMail, hkchk: (m) => pdCatHk(m, true), hkcat: (m) => pdCatHk(m, false), hkbest: pdBestHk };
   async function runPd(kind, m) {
@@ -2019,6 +2162,10 @@
       if (m.on === false) petCancel = petRun;
       else if (m.on === true) petRun || runPet();
       else runPet();
+      return;
+    }
+    if (m && m.vl === 1 && m.type === "mkt") {
+      runMkt(m);
       return;
     }
     if (m && m.vl === 1 && m.type === "sell") {
