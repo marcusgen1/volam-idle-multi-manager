@@ -213,3 +213,7 @@ rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để
 - Các script chỉ bấm những nút có sẵn trên giao diện game, nhưng vẫn là tự động hóa. Hãy tuân theo luật của game.
 - Script đọc giao diện game theo tên phần tử hiện tại. Khi game cập nhật có thể cần chỉnh lại `agent.js`.
 - Bán đồ, dùng bình và mở rương **không hoàn tác được**.
+
+## Giảm tải máy
+
+Mỗi khung game chỉ vẽ 15 khung hình/giây (game idle không cần hơn), giảm khoảng 40% CPU khi chạy 5 khung (đo: 218% → ~125% của một lõi, máy vẽ bằng CPU). Muốn đổi: `VL_FPS=30 ./chay-ung-dung.sh` (tối đa 60 = như cũ).
