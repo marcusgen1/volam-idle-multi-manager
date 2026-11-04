@@ -109,7 +109,7 @@ function createWindow() {
 // Khung game: không mở cửa sổ mới, không rời trang game (liên kết ngoài mở bằng trình duyệt của hệ thống)
 app.on("web-contents-created", (_e, wc) => {
   if (wc.getType() !== "webview") return;
-  // Game idle không cần 60 khung/giây; máy vẽ bằng CPU (không có GPU) thì mỗi khung hình tốn rất nhiều. Đặt VL_FPS=60 để về như cũ.
+  // Game idle không cần 60 khung/giây; 5 khung x 60 fps làm tiến trình đồ họa và các renderer tốn CPU đáng kể. Đặt VL_FPS=60 để về như cũ.
   const fps = Math.max(1, Math.min(60, parseInt(process.env.VL_FPS, 10) || 15));
   wc.setFrameRate(fps);
   wc.on("did-finish-load", () => wc.setFrameRate(fps));
