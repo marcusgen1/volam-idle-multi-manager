@@ -209,7 +209,7 @@
     ["dg", "🏯", "Phó Bản"],
     ["tower", "🗼", "Leo Tháp"],
   ];
-  const STEP_NAME = { sell: "Bán đồ", dd: "Điểm danh", bgop: "Góp bang", bshop: "Mua ở cửa hàng bang", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao" }; // các bước hẹn giờ không phải chế độ
+  const STEP_NAME = { sell: "Bán đồ", dd: "Điểm danh", bgop: "Góp bang", bshop: "Mua ở cửa hàng bang", ldt: "Mua lệnh bài", dong: "Đóng bình PD", dung: "Dùng bình PD", mo: "Mở hết PD", hb: "Mở hồng bao", doi: "Đổi lượng → KNB" }; // các bước hẹn giờ không phải chế độ
   const modeName = (m) => (MODES.find((x) => x[0] === m) || [0, 0, STEP_NAME[m] || m || "—"])[2];
 
   // Mỗi khung có một số cổng p cố định (cổng = BASE_PORT + p) nên phiên đăng nhập không bị lẫn khi thêm / xóa khung.
@@ -1520,9 +1520,10 @@
     { f: "dung", k: "dung", n: "Dùng bình PD", t: "Dùng hết bình Phúc Duyên Lộ trong hành trang" },
     { f: "mo", k: "mo", n: "Mở hết rương PD", t: "Mở hết rương Phúc Duyên" },
     { f: "hb", k: "hb", n: "Mở hồng bao", t: "Mở hồng bao" },
+    { f: "doi", k: "doi", n: "Đổi lượng → KNB", t: "Kỳ Trân Các: đổi hết lượng đang có ra KNB (như nút Đổi lượng → KNB), đến khi không còn đủ lượng. Không hoàn tác" },
     { f: "quest", k: "quest", n: "Nhiệm Vụ" },
   ];
-  const schedDefault = () => ({ id: newSchedId(), name: "Lịch mới", on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], order: SCHED_STEPS.map((x) => x.f), sell: true, dd: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, bgop: false, bshop: false, bgopMax: 15000, after: "tower", slots: null, last: {} });
+  const schedDefault = () => ({ id: newSchedId(), name: "Lịch mới", on: false, times: ["05:00"], days: [1, 1, 1, 1, 1, 1, 1], order: SCHED_STEPS.map((x) => x.f), sell: true, dd: true, dg: true, quest: true, buy: true, dong: false, dung: false, mo: false, hb: false, doi: false, bgop: false, bshop: false, bgopMax: 15000, after: "tower", slots: null, last: {} });
   // Thứ tự đã lưu (bỏ khóa lạ / trùng) rồi nối thêm các việc còn thiếu (bản cũ chưa có việc mới) vào cuối
   const schedOrder = (c) => {
     const known = SCHED_STEPS.map((x) => x.f), o = (c.order || []).filter((f, i, a) => known.includes(f) && a.indexOf(f) === i);
@@ -1693,7 +1694,7 @@
       case "name": c.name = x.value.trim() || "Lịch"; break;
       case "time": if (/^\d{2}:\d{2}$/.test(x.value)) c.times[k] = x.value; break;
       case "day": c.days[k] = x.checked ? 1 : 0; break;
-      case "sell": case "dd": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": case "bgop": case "bshop": c[x.dataset.s] = x.checked; break;
+      case "sell": case "dd": case "dg": case "quest": case "buy": case "dong": case "dung": case "mo": case "hb": case "doi": case "bgop": case "bshop": c[x.dataset.s] = x.checked; break;
       case "bgopMax": c.bgopMax = Math.max(1, Math.min(999999, Math.floor(+x.value) || 15000)); break;
       case "after": c.after = x.value === "tower" ? "tower" : "farm"; break;
       case "slot": {
@@ -1756,7 +1757,7 @@
     }
     else if (x.dataset.s === "now") {
       if (!schedTargets(c).length) { logToast("Hẹn giờ", "Không có khung nào đang bật"); return; }
-      if (!confirm("Chạy ngay lịch \"" + c.name + "\": " + schedSteps(c).join(" → ") + " ở " + schedTargets(c).length + " khung đang bật?" + ((c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : "") + (c.sell ? "\n\nBán đồ xanh + HK cơ bản không hoàn tác." : "") + (c.bgop ? "\n\nGóp ngân lượng cho bang tối đa " + (c.bgopMax | 0) + " vạn, không hoàn tác." : "") + (c.bshop ? "\n\nMua ở cửa hàng bang dùng điểm cống hiến, không hoàn tác." : "")))) return;
+      if (!confirm("Chạy ngay lịch \"" + c.name + "\": " + schedSteps(c).join(" → ") + " ở " + schedTargets(c).length + " khung đang bật?" + ((c.buy ? "\n\nMua lệnh bài Dã Tẩu dùng KNB khóa, không hoàn tác." : "") + (c.sell ? "\n\nBán đồ xanh + HK cơ bản không hoàn tác." : "") + (c.bgop ? "\n\nGóp ngân lượng cho bang tối đa " + (c.bgopMax | 0) + " vạn, không hoàn tác." : "") + (c.bshop ? "\n\nMua ở cửa hàng bang dùng điểm cống hiến, không hoàn tác." : "") + (c.doi ? "\n\nĐổi hết lượng ra KNB, không hoàn tác." : "")))) return;
       scDlg.close();
       schedStart(c, "manual " + Date.now(), "Chạy thử");
     }

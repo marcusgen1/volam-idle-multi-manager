@@ -32,8 +32,8 @@
   const TRACKER_ALWAYS_ON = true;
   // "Chạy tất cả": lần lượt các chế độ này, xong hết thì về Luyện Công
   const COMBO = ["dg", "quest"];
-  const STEPS = ["sell", "dd", "bgop", "bshop", "dg", "ldt", "dong", "dung", "mo", "hb", "quest"]; // các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống); thứ tự làm theo thứ tự trang quản lý gửi sang
-  const PD_STEPS = ["ldt", "dd", "bgop", "bshop", "dong", "dung", "mo", "hb"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
+  const STEPS = ["sell", "dd", "bgop", "bshop", "dg", "ldt", "dong", "dung", "mo", "hb", "doi", "quest"]; // các bước hẹn giờ ("sell" = bán đồ xanh + HK cơ bản để lấy chỗ trống); thứ tự làm theo thứ tự trang quản lý gửi sang
+  const PD_STEPS = ["ldt", "dd", "bgop", "bshop", "dong", "dung", "mo", "hb", "doi"]; // bước nào là một việc "pd" (cùng nút trong trang quản lý)
   // Dòng nhật ký game ghi khi tự dời về bãi luyện công vì hết việc
   const DONE_LOG = { quest: "Hết nhiệm vụ, luyện công", dg: "Hết lượt phó bản, luyện công" };
   const TOAST_DONE = { dg: "Hết lượt phó bản" };
