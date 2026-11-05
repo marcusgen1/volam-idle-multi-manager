@@ -109,6 +109,11 @@ function createWindow() {
 // Khung game: không mở cửa sổ mới, không rời trang game (liên kết ngoài mở bằng trình duyệt của hệ thống)
 app.on("web-contents-created", (_e, wc) => {
   if (wc.getType() !== "webview") return;
+  // Màn hình đen của game (body.saver) chỉ che hình, các hiệu ứng CSS lặp vô hạn (vòng sáng thú, biểu tượng cảm xúc…) vẫn chạy nên mỗi khung vẫn tính lại style/layout 60 lần/giây.
+  // Tắt hiệu ứng khi đang ở màn hình đen (đo: số lần tính lại style 60 → 13 mỗi giây, CPU renderer ~36% → ~17%). Chèn CSS từ bên ngoài, không đụng tới JavaScript của trang.
+  wc.on("dom-ready", () => {
+    wc.insertCSS("body.saver *, body.saver *::before, body.saver *::after { animation: none !important; transition: none !important; }").catch(() => {});
+  });
   wc.setWindowOpenHandler(({ url }) => {
     openExternal(url);
     return { action: "deny" };

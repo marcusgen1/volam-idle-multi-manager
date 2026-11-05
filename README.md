@@ -213,3 +213,7 @@ rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để
 - Các script chỉ bấm những nút có sẵn trên giao diện game, nhưng vẫn là tự động hóa. Hãy tuân theo luật của game.
 - Script đọc giao diện game theo tên phần tử hiện tại. Khi game cập nhật có thể cần chỉnh lại `agent.js`.
 - Bán đồ, dùng bình và mở rương **không hoàn tác được**.
+
+## Giảm tải máy
+
+Khi khung bật "Màn hình đen" của game, ứng dụng tắt các hiệu ứng CSS lặp vô hạn trong khung đó (game chỉ che hình chứ không dừng chúng). Đo trên khung thật: số lần tính lại style 60 → 13 mỗi giây, CPU của renderer khoảng 36% → 17% của một lõi. Không ảnh hưởng game hay agent.
