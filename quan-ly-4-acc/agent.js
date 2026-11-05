@@ -2187,6 +2187,11 @@
       if (autoSell) autoSellTick().catch(() => {}); // kiểm tra ngay khi vừa bật, không phải chờ 30 giây
       return;
     }
+    if (m && m.vl === 1 && m.type === "kite") {
+      kiteOn = !!m.on;
+      kiteFloor = 0;
+      return;
+    }
     if (m && m.vl === 1 && m.type === "black") {
       setBlack(!!m.on);
       return;
@@ -2438,6 +2443,55 @@
     }
   };
 
+  // Lùa quái ở Leo Tháp: mỗi lần vào tháp hoặc lên tầng mới, nhân vật đi một vòng hình tam giác (phải → chéo lên-trái → xuống) để quái đuổi theo dồn lại một chỗ, rồi trả về chế độ tự động để đánh.
+  // Game cho tự điều khiển bằng phím mũi tên (bấm mũi tên là chuyển sang "Tự điều khiển", nút #ctrlBtn.on = đang Auto) nên chỉ cần giữ / nhả phím mũi tên rồi bấm #ctrlBtn trả về Auto.
+  // Tốc độ đi ~150 px/giây nên mỗi cạnh KITE_LEG_MS mili giây đi được ~KITE_LEG_MS*0.15 px; ba cạnh khép kín (1 : 1,414 : 1).
+  const KITE_LEG_MS = 900;
+  const KITE_LEGS = [[["ArrowRight"], KITE_LEG_MS], [["ArrowUp", "ArrowLeft"], Math.round(KITE_LEG_MS * 1.414)], [["ArrowDown"], KITE_LEG_MS]];
+  let kiteOn = false;
+  let kiteFloor = 0; // tầng đã lùa quái xong (0 = chưa vào tháp)
+  let kiteRun = false;
+  const kiteKey = (type, key) => document.body.dispatchEvent(new KeyboardEvent(type, { key, code: key, bubbles: true }));
+  async function kiteTriangle() {
+    if (kiteRun) return;
+    kiteRun = true;
+    const btn = q("#ctrlBtn");
+    const wasAuto = !!btn && btn.classList.contains("on");
+    const held = new Set();
+    const hold = (keys) => {
+      for (const k of [...held]) if (!keys.includes(k)) { kiteKey("keyup", k); held.delete(k); }
+      for (const k of keys) if (!held.has(k)) { kiteKey("keydown", k); held.add(k); }
+    };
+    try {
+      await wait(600); // game vừa dựng tầng mới: chờ quái xuất hiện
+      for (const [keys, ms] of KITE_LEGS) {
+        if (curMode() !== "tower" || !kiteOn) return;
+        hold(keys);
+        const end = Date.now() + ms;
+        while (Date.now() < end) {
+          await wait(100);
+          if (curMode() !== "tower" || !kiteOn) return;
+        }
+      }
+    } finally {
+      hold([]);
+      const b = q("#ctrlBtn");
+      if (wasAuto && b && !b.classList.contains("on")) b.click(); // đang Tự điều khiển do vòng vừa rồi: về Auto
+      kiteRun = false;
+    }
+  }
+  const kiteTick = () => {
+    if (!kiteOn) return;
+    if (curMode() !== "tower") {
+      kiteFloor = 0; // ra khỏi tháp: lần vào lại (kể cả gục ngã rồi vào lại) lùa quái lại từ đầu
+      return;
+    }
+    const f = readTower();
+    if (!f || f === kiteFloor || kiteRun || petUi || pdRun || sellRun || bossRun || modalOpen()) return;
+    kiteFloor = f;
+    kiteTriangle().catch(() => {});
+  };
+
   function tick() {
     loginWatch();
     if (!q("#mswMenu")) {
@@ -2449,6 +2503,7 @@
       return;
     }
     heroTick();
+    kiteTick();
     const mode = curMode();
 
     if (desired && !applied) {

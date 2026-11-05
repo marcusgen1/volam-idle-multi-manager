@@ -214,6 +214,10 @@ rồi tải lại khung. Nút 🌐 sáng lên khi khung đang dùng proxy; để
 - Script đọc giao diện game theo tên phần tử hiện tại. Khi game cập nhật có thể cần chỉnh lại `agent.js`.
 - Bán đồ, dùng bình và mở rương **không hoàn tác được**.
 
+## Lùa quái ở Leo Tháp
+
+Nút **🔺 Lùa quái ở tháp** (nhóm Chạy, mặc định TẮT): mỗi lần vào Leo Tháp hoặc lên tầng mới, nhân vật chạy một vòng hình tam giác (phải → chéo lên-trái → xuống, mỗi cạnh ~0,9 giây) để quái đuổi theo dồn lại một chỗ, rồi trả về chế độ Auto để đánh. Cách làm: giữ / nhả phím mũi tên của game (bấm mũi tên là game tự chuyển sang "Tự điều khiển") rồi bấm nút Auto trả lại. Tầng nhận biết qua chữ "Tháp · tầng N" của game. Ra khỏi tháp (gục ngã, đổi chế độ) thì lần vào lại lùa lại. Độ dài cạnh chỉnh ở hằng số `KITE_LEG_MS` trong `agent.js`.
+
 ## Giảm tải máy
 
 Khi khung bật "Màn hình đen" của game, ứng dụng tắt các hiệu ứng CSS lặp vô hạn trong khung đó (game chỉ che hình chứ không dừng chúng). Đo trên khung thật: số lần tính lại style 60 → 13 mỗi giây, CPU của renderer khoảng 36% → 17% của một lõi. Không ảnh hưởng game hay agent.

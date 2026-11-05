@@ -392,6 +392,7 @@
       const d = state.slots[i].desired;
       if (d) { ensureGrid(d); send(i, d, true); }
       if (state.autoSell) sendAutoSell(i); // khung vừa tải lại: bật lại tự bán nếu đang bật
+      if (state.kite) post(i, { type: "kite", on: true }); // và Lùa quái ở Leo Tháp
       if (state.slots[i].pet) sendPet(i, true); // và Bắt thú nếu khung này đang bật
     } else if (m.type === "mkt") {
       mktMsg(i, m);
@@ -1034,6 +1035,20 @@
   allBox.appendChild(guiHkBtn);
 
 
+  const kiteBtn = document.createElement("button");
+  const renderKite = () => {
+    kiteBtn.textContent = "🔺 Lùa quái ở tháp: " + (state.kite ? "BẬT" : "TẮT");
+    kiteBtn.classList.toggle("on", !!state.kite);
+  };
+  kiteBtn.title = "Bật: mỗi lần vào Leo Tháp hoặc lên tầng mới, nhân vật chạy một vòng hình tam giác để lùa quái lại một chỗ rồi mới đánh (dùng phím mũi tên của game, xong tự về chế độ Auto)";
+  kiteBtn.onclick = () => {
+    state.kite = !state.kite;
+    save();
+    renderKite();
+    forOn((i) => post(i, { type: "kite", on: !!state.kite }));
+  };
+  renderKite();
+  allBox.appendChild(kiteBtn);
   // ----- Gom các nút "Tất cả" thành nhóm thu / mở được cho menu trái gọn lại (trạng thái nhớ trong trình duyệt) -----
   (() => {
     const kids = [...allBox.children];
@@ -1041,7 +1056,7 @@
     const range = (a, b) => kids.slice(at(a), at(b) + 1);
     const modeBtns = kids.slice(at(comboSel) + 1, at(bossBtn));
     const defs = [
-      ["run", "Chạy", true, [comboBtn, comboSel, ...modeBtns, bossBtn, petBtn]],
+      ["run", "Chạy", true, [comboBtn, comboSel, ...modeBtns, bossBtn, petBtn, kiteBtn]],
       ["sell", "Bán đồ", false, range(sellBtn, keptLbl)],
       ["pd", "Phúc Duyên", false, range(dongBtn, nguaBtn)],
       ["day", "Hằng ngày & bang", false, range(ldtBtn, bshopBtn)],
