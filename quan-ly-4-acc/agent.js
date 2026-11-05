@@ -2470,7 +2470,7 @@
         const end = Date.now() + ms;
         while (Date.now() < end) {
           await wait(100);
-          if (curMode() !== "tower" || !kiteOn) return;
+          if (curMode() !== "tower" || !kiteOn || document.visibilityState !== "visible") return;
         }
       }
     } finally {
@@ -2486,6 +2486,8 @@
       kiteFloor = 0; // ra khỏi tháp: lần vào lại (kể cả gục ngã rồi vào lại) lùa quái lại từ đầu
       return;
     }
+    // Cửa sổ ứng dụng thu nhỏ / bị che lâu: trình duyệt chỉ cho hẹn giờ chạy mỗi phút một lần, giữ phím sẽ thành đi một hướng cả phút → không lùa
+    if (document.visibilityState !== "visible") return;
     const f = readTower();
     if (!f || f === kiteFloor || kiteRun || petUi || pdRun || sellRun || bossRun || modalOpen()) return;
     kiteFloor = f;
