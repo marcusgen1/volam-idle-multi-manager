@@ -2423,7 +2423,7 @@
   let loginSeen = 0;
   let loginSent = 0;
   let lastKeyAt = 0;
-  if (BR && BR.loginScreen) document.addEventListener("keydown", () => { lastKeyAt = Date.now(); }, true);
+  document.addEventListener("keydown", () => { lastKeyAt = Date.now(); }, true);
   const loginWatch = () => {
     if (!BR || !BR.loginScreen) return;
     const pw = q("#ngP");
@@ -2438,8 +2438,39 @@
     }
   };
 
+  // Màn "Chọn Nhân Vật" (#csel) hiện ra sau khi đăng nhập / tải lại khung: tự bấm "Xác Định" (#csGo) vào nhân vật đang chọn.
+  // Chỉ làm khi thấy liên tục CS_WAIT_MS mà bạn không gõ phím / bấm chuột (để kịp tự đổi nhân vật), và chỉ cho tới khi vào game được
+  // một lần trong lần tải trang này (sau đó bạn tự thoát ra màn chọn thì không kéo vào lại). Không bấm khi ô đang chọn là ô trống.
+  const CS_WAIT_MS = 3000;
+  const CS_RETRY_MS = 15000;
+  const CS_MAX_TRIES = 4;
+  let csSeen = 0;
+  let csSent = 0;
+  let csTries = 0;
+  let csEntered = false;
+  let lastPointerAt = 0;
+  document.addEventListener("pointerdown", (e) => { if (e.isTrusted) lastPointerAt = Date.now(); }, true);
+  const charSelectWatch = () => {
+    if (csEntered) return;
+    if (q("#mswMenu")) { csEntered = true; csSeen = 0; return; }
+    const go = q("#csGo");
+    const slot = q("#csel .cs-slot.on");
+    const box = go && go.getBoundingClientRect(); // #csel là position:fixed nên không dùng offsetParent
+    if (!go || !slot || slot.classList.contains("empty") || !box.width || !box.height) { csSeen = 0; return; }
+    const now = Date.now();
+    if (now - lastKeyAt < 8000 || now - lastPointerAt < 8000) { csSeen = 0; return; }
+    if (!csSeen) csSeen = now;
+    if (now - csSeen >= CS_WAIT_MS && now - csSent >= CS_RETRY_MS && csTries < CS_MAX_TRIES) {
+      csSent = now;
+      csTries++;
+      console.log("[VL] Tự bấm Xác Định (lần " + csTries + ")");
+      go.click();
+    }
+  };
+
   function tick() {
     loginWatch();
+    charSelectWatch();
     if (!q("#mswMenu")) {
       // Chưa đăng nhập / đã đăng xuất: quên tên cũ để lần đăng nhập sau (có thể là nhân vật khác) đọc lại
       heroName = "";
