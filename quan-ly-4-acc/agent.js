@@ -1940,38 +1940,100 @@
     s.dispatchEvent(new Event("change", { bubbles: true }));
     await wait(60);
   }
+  // Ô đồ thật (có data-uid): bỏ qua các ô vật phẩm (Mật Tịch...) game xếp chung lưới, và ô trong rương mở rộng khi bảng đó đang mở
+  const bagTiles = () => qa("#t-inv .invgrid .it[data-uid], .u2rx .invgrid .it[data-uid]");
   const isBlueTile = (el) => el.classList.contains("r1") && !el.querySelector(".lk");
-  const blueTiles = () => qa("#t-inv .invgrid .it").filter(isBlueTile);
+  const blueTiles = () => bagTiles().filter(isBlueTile);
   const closeAnyModal = () => {
     const c = q("#mClose");
     if (c) c.click();
   };
+  // Hành trang bản game mới chỉ vẽ 60 ô đầu ở thẻ Hành trang; phần còn lại nằm trong các trang "Mở rộng" (nút #bInvX, thẻ .u2rxtab) và
+  // bị gỡ khỏi trang khi bảng đó đóng. Gọi visit() lần lượt trên trang chính rồi từng trang mở rộng đã mở khóa (bảng tự mở rồi đóng lại).
+  async function eachBagPage(visit) {
+    await visit();
+    if (!q("#bInvX")) return;
+    const panel = q(".u2rx");
+    const opened = !panel || panel.hidden;
+    if (opened) {
+      q("#bInvX").click();
+      await wait(300);
+    }
+    try {
+      const n = qa(".u2rxtab button").length;
+      for (let i = 0; i < n; i++) {
+        const tab = qa(".u2rxtab button")[i]; // mỗi lần đổi trang game vẽ lại cả bảng nên tìm lại nút
+        if (!tab || /🔒/.test(tab.textContent)) continue;
+        tab.click();
+        await wait(250);
+        await visit();
+      }
+    } finally {
+      const b = q("#bInvX");
+      if (opened && b && q(".u2rx") && !q(".u2rx").hidden) {
+        b.click();
+        await wait(250);
+      }
+    }
+  }
+  // Máy chủ không cho bán "Đồ phổ" (món icon dopho.png) cho NPC và hủy CẢ lô Dọn kho nếu lô có một món như vậy ("Đồ phổ không bán NPC"),
+  // trong khi Dọn kho của game vẫn xếp chúng vào đồ xanh. Nên trước khi Dọn kho khóa tạm các món này (game bỏ qua món khóa), xong mở khóa lại.
+  const isDpTile = (el) => el.classList.contains("r4") && /dopho/.test((el.querySelector("img") || {}).src || "");
+  async function setDpLock(lock, only) {
+    const done = [];
+    const tried = new Set();
+    await eachBagPage(async () => {
+      for (let guard = 0; guard < 80; guard++) {
+        const tile = bagTiles().find((el) => isDpTile(el) && !tried.has(el.dataset.uid) && (only ? only.includes(el.dataset.uid) : true) && !!el.querySelector(".lk") === !lock);
+        if (!tile) break;
+        const uid = tile.dataset.uid;
+        tried.add(uid);
+        tile.click();
+        const btn = await waitFor(() => q("#bLock"), 2000);
+        if (btn && !btn.disabled && /Mở khóa/.test(btn.textContent) === !lock) {
+          btn.click();
+          if (await waitFor(() => !tile.isConnected || !!tile.querySelector(".lk") === lock, 2500)) done.push(uid);
+        }
+        closeAnyModal();
+        await wait(60);
+      }
+    });
+    return done;
+  }
   // Bán lẻ từng món xanh còn lại (kể cả món game đang "giữ"): bấm vào ô để mở chi tiết món, [Bán], rồi xác nhận.
   // Bỏ qua món khóa 🔒 hoặc đang giữ để nộp Dã Tẩu 📜 (ô có biểu tượng khóa).
   async function sellBlueTiles() {
     let sold = 0;
+    let stop = false;
     const tried = new Set();
-    for (let guard = 0; guard < 120; guard++) {
-      const tile = blueTiles().find((el) => !tried.has(el.dataset.uid));
-      if (!tile) break;
-      tried.add(tile.dataset.uid);
-      tile.click();
-      const btn = await waitFor(() => q("#bSell"), 2000);
-      if (!btn || btn.disabled) {
-        closeAnyModal();
-        await wait(60);
-        continue;
-      }
-      btn.click();
-      const ask = await waitFor(() => q("#askBox"), 2000);
-      if (!ask) {
-        closeAnyModal();
-        break;
-      }
-      const yes = ask.querySelector('[data-a="1"]');
-      if (yes) yes.click();
-      if (await waitFor(() => !tile.isConnected, 2500)) sold++;
-      await wait(60);
+    for (let cycle = 0; cycle < 3 && !stop; cycle++) {
+      const before = sold;
+      await eachBagPage(async () => {
+        for (let guard = 0; guard < 150 && !stop; guard++) {
+          const tile = blueTiles().find((el) => !tried.has(el.dataset.uid));
+          if (!tile) break;
+          tried.add(tile.dataset.uid);
+          tile.click();
+          const btn = await waitFor(() => q("#bSell"), 2000);
+          if (!btn || btn.disabled) {
+            closeAnyModal();
+            await wait(60);
+            continue;
+          }
+          btn.click();
+          const ask = await waitFor(() => q("#askBox"), 2000);
+          if (!ask) {
+            closeAnyModal();
+            stop = true;
+            break;
+          }
+          const yes = ask.querySelector('[data-a="1"]');
+          if (yes) yes.click();
+          if (await waitFor(() => !tile.isConnected, 2500)) sold++;
+          await wait(60);
+        }
+      });
+      if (sold === before) break; // cả vòng không bán thêm được món nào: xong (món bán xong làm món ở trang sau dồn lên trang trước nên có thể cần vòng nữa)
     }
     return sold;
   }
@@ -2041,15 +2103,22 @@
     const prev = activeTab();
     if (prev !== "inv") invTab.click();
     await wait(150);
-    const blueBefore = blueTiles().length; // số ô xanh (chưa khóa) đang có trong hành trang
-    let bulk = 0;
+    let planned = 0; // số món màn Dọn kho hứa bán
+    let bulk = 0; // số món hành trang thật sự giảm sau khi Dọn kho (máy chủ có thể từ chối cả lô)
     let goldTxt = "";
     let err = "";
+    let refused = "";
+    let dpLocked = [];
     try {
+      dpLocked = await setDpLock(true);
       const don = q("#bDonKho");
       if (!don) {
         err = "không thấy nút Dọn kho";
       } else {
+        const nBefore = (readInvCount() || {}).n;
+        const dkLines = () => (q("#u20log") ? q("#u20log").textContent.match(/Dọn kho: [^.]*\./g) || [] : []); // kết quả Dọn kho game ghi vào nhật ký
+        const dkN0 = dkLines().length;
+        const dkLast0 = dkLines().slice(-1)[0];
         don.click();
         if (!(await waitFor(() => q("#dkGo"), 3000))) {
           err = "không mở được màn Dọn kho";
@@ -2066,8 +2135,8 @@
             for (const k of DK_KEYS) await dkSet(k, DK_WANT[k]);
             await dkSetLv(10);
             const sum = q("#mBody .dk-sum b");
-            bulk = sum ? digits(sum.textContent) : 0;
-            if (bulk > 0) {
+            planned = sum ? digits(sum.textContent) : 0;
+            if (planned > 0) {
               const gold = q("#mBody .dk-sum b.gold");
               goldTxt = gold ? gold.textContent.trim() : "";
               q("#dkGo").click();
@@ -2080,6 +2149,21 @@
             if (no) no.click();
             else closeAnyModal();
           }
+          if (planned > 0) {
+            // Máy chủ bán xong game mới ghi kết quả ("Dọn kho: bán N món ..." hoặc lý do từ chối): lấy đúng số đó, đừng tin số "sẽ bán" trên màn Dọn kho
+            const gotLine = await waitFor(() => {
+              const l = dkLines();
+              return l.length > dkN0 || (l.length && l[l.length - 1] !== dkLast0) ? l[l.length - 1] : null;
+            }, 8000);
+            if (gotLine) {
+              const m = gotLine.match(/bán (\d+) món/);
+              bulk = m ? +m[1] : 0;
+              if (!m) refused = gotLine.replace(/^Dọn kho: /, "").replace(/\.$/, "");
+            } else if (nBefore != null) {
+              await wait(300);
+              bulk = Math.max(0, nBefore - ((readInvCount() || { n: nBefore }).n)); // không thấy dòng nhật ký: đo số ô giảm
+            }
+          }
         }
       }
       // Tùy chọn: bán nốt các món xanh game đang giữ (khớp luật giữ / mạnh hơn đồ đang mặc)
@@ -2088,20 +2172,28 @@
         await wait(150);
         single = await sellBlueTiles();
       }
-      const left = blueTiles().length;
+      let left = 0;
+      {
+        const seen = new Set();
+        await eachBagPage(async () => blueTiles().forEach((el) => seen.add(el.dataset.uid)));
+        left = seen.size;
+      }
       const total = bulk + single;
       let msg;
       if (err) msg = err;
       else if (total > 0)
-        msg = "đã bán " + total + " món đồ xanh" + (bulk && goldTxt ? " (Dọn kho " + bulk + " món, " + goldTxt + " lượng)" : "") +
+        msg = "đã bán " + total + " món đồ xanh" + (bulk && goldTxt && bulk === planned ? " (Dọn kho " + bulk + " món, " + goldTxt + " lượng)" : bulk ? " (Dọn kho " + bulk + " món)" : "") +
           (single ? " · bán lẻ " + single + " món đang được giữ" : "");
       else if (left > 0)
         msg = "Dọn kho không có món nào để bán, nhưng còn " + left + " ô xanh trong hành trang: game đang GIỮ chúng (khớp luật giữ / mạnh hơn đồ đang mặc). " +
           "Bật ô \"gồm cả đồ được giữ\" nếu muốn bán.";
       else msg = "không có đồ xanh nào để bán";
+      if (planned > 0 && bulk < planned && !err) msg += " · Dọn kho chỉ bán được " + bulk + "/" + planned + " món" + (refused ? " (game báo: " + refused + ")" : "");
       if (total > 0 && left > 0) msg += " · còn " + left + " ô xanh (game đang giữ)";
+      if (dpLocked.length) msg += " · " + dpLocked.length + " món Đồ phổ (không bán được cho NPC) đã được giữ lại, gửi thư hoặc bày bán ở Chợ";
       return { sold: total, msg, kept: left };
     } finally {
+      if (dpLocked.length) await setDpLock(false, dpLocked).catch(() => {});
       restoreTab(prev);
     }
   }
