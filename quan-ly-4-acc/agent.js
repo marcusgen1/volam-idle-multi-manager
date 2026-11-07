@@ -57,6 +57,7 @@
   let explicit = false; // lệnh vừa nhận là do bạn chủ động chọn (không phải khôi phục sau khi tải lại)
   let workSeen = false; // từ lúc đặt Nhiệm Vụ / Phó Bản đã thấy khung Theo Dấu có việc chưa
   let idleSince = 0; // thời điểm khung Theo Dấu bắt đầu trống
+  let labelSeen = false; // từ lúc đặt Nhiệm Vụ / Phó Bản đã thấy nhãn chế độ của game đúng là chế độ đó chưa
   let logBase = 0; // số dòng "hết việc" đã có sẵn trong nhật ký lúc bắt đầu
 
   const q = (s) => document.querySelector(s);
@@ -92,6 +93,7 @@
     towerSince = 0;
     towerDeaths = 0;
     workSeen = false;
+    labelSeen = false;
     idleSince = 0;
     questTokSig = "";
     questTokSince = 0;
@@ -199,7 +201,11 @@
   };
   const curMode = () => {
     const on = q("#mswMenu [data-msw].on");
-    return on ? on.dataset.msw : null;
+    const m = on ? on.dataset.msw : null;
+    // Bản game mới: vào tháp được vài giây thì nhãn chế độ tự quay về Luyện Công dù nhân vật vẫn đang leo (tầng vẫn tăng),
+    // nên đang ở bãi "Thông Thiên Tháp · tầng N" thì coi là Leo Tháp. Nếu không, lần nào cũng bị tính nhầm là gục ngã.
+    if (m === "farm" && readTower()) return "tower";
+    return m;
   };
   const clickMode = (m) => {
     const b = q('#mswMenu [data-msw="' + m + '"]');
@@ -2450,6 +2456,7 @@
     }
     heroTick();
     const mode = curMode();
+    if (mode === desired) labelSeen = true;
 
     if (desired && !applied) {
       applied = true;
@@ -2465,8 +2472,10 @@
       }
       explicit = false;
       if (desired === "dg" && toastHas(TOAST_DONE.dg)) finishWork("thông báo hết lượt");
-    } else if ((desired === "quest" || desired === "dg") && mode === desired) {
+    } else if ((desired === "quest" || desired === "dg") && (mode === desired || (labelSeen && mode === "farm"))) {
       // Game giữ nhãn Nhiệm Vụ / Phó Bản dù đã hết việc (chỉ dời bãi). Nhận biết hết việc để tự về Luyện Công.
+      // Bản game mới đôi khi tự đưa nhãn về Luyện Công giữa chừng (nhân vật vẫn đang trong phó bản): vẫn xét tiếp bằng khung Theo Dấu
+      // như cũ, nếu không bước "Phó Bản" của lần chạy hẹn giờ kẹt mãi, không sang được Nhiệm Vụ.
       const busy = trackerBusy(desired); // khung Theo Dấu còn ghi việc của chế độ này không
       const now = Date.now();
       let done = false;
