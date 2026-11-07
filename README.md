@@ -112,6 +112,7 @@ Cần cài `git` và chạy từ bản clone (không phải tải zip); không t
   Nhiệm Vụ / Phó Bản chạy riêng thì tự về Luyện Công khi hết việc; Leo Tháp tự vào lại khi gục ngã và dừng sau 3 lần chết liên tiếp.
 - **Boss tuần**: tự khiêu chiến đến hết lượt (bấm lần nữa để dừng).
 - **Bán đồ xanh** (💰; thủ công + **Tự bán** khi hành trang đầy, Tự bán chỉ bán đồ xanh), tùy chọn gồm cả đồ xanh game đang giữ.
+  - Bán đồ xanh dùng màn **Dọn kho** của game (một lần cho cả hành trang, kể cả các trang "Mở rộng" của hành trang). Máy chủ không cho bán **Đồ phổ** cho NPC và hủy cả lô nếu lô có một món Đồ phổ ("Đồ phổ không bán NPC"), nên trước khi Dọn kho ứng dụng **khóa tạm** các món Đồ phổ rồi mở khóa lại sau; chúng ở nguyên trong hành trang, bạn tự gửi thư hoặc bày bán ở Chợ. Số món "đã bán" lấy từ kết quả game ghi trong nhật ký, không phải số dự kiến trên màn Dọn kho. Khi bật "gồm đồ giữ", phần bán lẻ cũng đi qua từng trang Mở rộng (hành trang bản game mới chỉ vẽ 60 ô đầu).
 - **Bán HK cơ bản** (🛡, chỉ thủ công, không nằm trong Tự bán): bán lẻ đồ **Hoàng Kim cơ bản** — món có tên bắt đầu bằng Định Quốc, Hiệp Cốt, Kim Phong hoặc
   Thiên Hoàng — lấy **KNB khóa** (game đổi mỗi món Hoàng Kim 10 KNB khóa). Món HK cơ bản đang khóa 🔒 được **tự mở khóa trước khi bán** (nút 🛡 ở menu trái và nút 🛡 từng khung; bán theo lịch và Tự bán vẫn giữ món khóa).
   Giữ lại: món đang giữ cho Dã Tẩu 📜, món đã cường hóa (+N), đồ đang mặc, đồ Hoàng Kim bộ khác (An Bang, Môn Phái…) dù khóa hay không, Bạch Kim và đồ xanh.
